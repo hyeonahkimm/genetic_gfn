@@ -1,0 +1,12 @@
+name: smiles_ga
+method: grid
+metric:
+  goal: maximize
+  name: avg_auc
+parameters:
+  gene_size: 
+    values: [200, 100, 300]
+  population_size: 
+    values: [100, 50, 200]
+  n_mutations: 
+    values: [300, 500, 800]

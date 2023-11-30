@@ -1,0 +1,14 @@
+name: synnet
+method: random
+metric:
+  goal: maximize
+  name: avg_auc
+parameters:
+  num_population:
+    values: [50, 100, 150, 200]
+  num_offspring:
+    values: [250, 500, 750, 1000]
+  mut_probability:
+    values: [0, 0.1, 0.5, 0.8]
+  num_mut_per_ele:
+    values: [2, 4, 12, 24, 36]

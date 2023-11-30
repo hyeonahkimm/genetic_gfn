@@ -1,0 +1,8 @@
+vocab_path: 'main/jt_vae/data/zinc/vocab.txt'
+model_path: 'main/jt_vae/fast_molvae/vae_model/model.iter-25000'
+hidden_size: 450
+latent_size: 56
+depthT: 20
+depthG: 3
+train_num: 100
+bo_batch: 10

@@ -1,0 +1,11 @@
+name: selfies_ga
+method: grid
+metric:
+  goal: maximize
+  name: avg_auc
+parameters:
+  generation_size: 
+    values: [100, 300, 500, 700]
+  beta: 
+    values: [0, 1, 2, 5, 10, 20]
+

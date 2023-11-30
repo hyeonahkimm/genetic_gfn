@@ -1,0 +1,10 @@
+name: jt_vae_bo
+method: grid
+metric:
+  goal: maximize
+  name: avg_auc
+parameters:
+  train_num:
+    values: [50, 100]
+  bo_batch:
+    values: [3, 5, 10]

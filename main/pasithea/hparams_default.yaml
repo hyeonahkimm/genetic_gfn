@@ -1,0 +1,14 @@
+upperbound_tr: 0.95
+upperbound_dr: 0.90
+property_value: 6
+lr_train: 0.001
+lr_dream: 0.005
+dream_num_epochs: 50
+train_num_epochs: 5
+initial_data_size: 800
+num_dream: 1000
+
+model:
+  num_of_neurons_layer1: 500
+  num_of_neurons_layer2: 500
+  num_of_neurons_layer3: 500

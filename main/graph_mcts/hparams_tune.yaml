@@ -1,0 +1,18 @@
+name: graph_mcts
+method: bayes
+metric:
+  goal: maximize
+  name: avg_auc
+parameters:
+  max_children: 
+    distribution: int_uniform
+    min: 2
+    max: 20
+  num_sims: 
+    distribution: int_uniform
+    min: 2
+    max: 30
+  exploration_coefficient:
+    distribution: uniform
+    min: 1
+    max: 5

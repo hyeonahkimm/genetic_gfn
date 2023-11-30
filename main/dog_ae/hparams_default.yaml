@@ -1,0 +1,2 @@
+train_num: 100
+bo_batch: 10
