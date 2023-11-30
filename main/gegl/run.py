@@ -117,6 +117,19 @@ class GEGL_Optimizer(BaseOptimizer):
                 print('max oracle hit')
                 break
 
+            # early stopping
+            if len(self.oracle) > 1000:
+                self.sort_buffer()
+                new_scores = [item[1][0] for item in list(self.mol_buffer.items())[:100]]
+                if new_scores == old_scores:
+                    patience += 1
+                    if patience >= self.args.patience*2:
+                        self.log_intermediate(finish=True)
+                        print('convergence criteria met, abort ...... ')
+                        break
+                else:
+                    patience = 0
+
             expert_storage.add_list(smis=smis, scores=score)
             expert_storage.squeeze_by_kth(k=config['num_keep'])
 
@@ -134,5 +147,7 @@ class GEGL_Optimizer(BaseOptimizer):
                 avg_loss += loss / config['num_apprentice_training_steps']
 
             fit_size = len(total_smis)
+
+            step += 1
 
 
