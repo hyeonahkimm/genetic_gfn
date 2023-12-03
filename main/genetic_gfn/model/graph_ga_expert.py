@@ -67,7 +67,13 @@ class GeneticOperatorHandler:
         # add new_population
         # population_mol += offspring_mol
 
-        smis = [Chem.MolToSmiles(m, canonical=True) for m in offspring_mol]
+        smis = []
+        for m in offspring_mol:
+            try:
+                smis.append(Chem.MolToSmiles(m, canonical=True))
+            except:
+                pass
+        # smis = [Chem.MolToSmiles(m, canonical=True) for m in offspring_mol]
         # smis = random.choices(mating_pool, k=query_size * 2)
         # smi0s, smi1s = smis[:query_size], smis[query_size:]
         # smis = pool(
