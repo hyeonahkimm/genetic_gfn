@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+import torch
 import random
 from typing import List
 
@@ -17,7 +18,7 @@ import gc
 
 MINIMUM = 1e-10
 
-def make_mating_pool(population_mol: List[Mol], population_scores, offspring_size: int):
+def make_mating_pool(population_mol: List[Mol], population_scores, offspring_size: int, rank_based=False):
     """
     Given a population of RDKit Mol and their scores, sample a list of the same size
     with replacement using the population_scores as weights
@@ -28,10 +29,21 @@ def make_mating_pool(population_mol: List[Mol], population_scores, offspring_siz
     Returns: a list of RDKit Mol (probably not unique)
     """
     # scores -> probs 
-    population_scores = [s + MINIMUM for s in population_scores]
-    sum_scores = sum(population_scores)
-    population_probs = [p / sum_scores for p in population_scores]
-    mating_pool = np.random.choice(population_mol, p=population_probs, size=offspring_size, replace=True)
+    if rank_based:
+        scores_np = np.array(population_scores)
+        ranks = np.argsort(np.argsort(-1 * scores_np))
+        weights = 1.0 / (1e-2 * len(scores_np) + ranks)
+        indices = list(torch.utils.data.WeightedRandomSampler(
+            weights=weights, num_samples=offspring_size, replacement=True
+            ))
+        mating_pool = [population_mol[i] for i in indices if population_mol[i] is not None]
+        # print(mating_pool)
+    else:
+        population_scores = [s + MINIMUM for s in population_scores]
+        sum_scores = sum(population_scores)
+        population_probs = [p / sum_scores for p in population_scores]
+        mating_pool = np.random.choice(population_mol, p=population_probs, size=offspring_size, replace=True)
+
     return mating_pool
 
 
@@ -51,17 +63,18 @@ def reproduce(mating_pool, mutation_rate):
 
 
 class GeneticOperatorHandler:
-    def __init__(self, mutation_rate: float=0.067, population_size = 120, offspring_size=70):
+    def __init__(self, mutation_rate: float=0.067, population_size=200, offspring_size=50, rank_based=False):
         self.chromosome = 'graph'
         self.mutation_rate = mutation_rate
         self.population_size = population_size
+        self.rank_based = rank_based
 
     def query(self, query_size, mating_pool, pool):
         # print(mating_pool)
         population_mol = [Chem.MolFromSmiles(s) for s in mating_pool[0]]
         population_scores = mating_pool[1]
 
-        new_mating_pool = make_mating_pool(population_mol, population_scores, self.population_size)
+        new_mating_pool = make_mating_pool(population_mol, population_scores, self.population_size, self.rank_based)
         offspring_mol = pool(delayed(reproduce)(new_mating_pool, self.mutation_rate) for _ in range(query_size))
 
         # add new_population

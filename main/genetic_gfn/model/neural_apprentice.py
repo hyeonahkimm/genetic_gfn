@@ -102,13 +102,13 @@ class SmilesGeneratorHandler:
         self.max_seq_length = self.char_dict.max_smi_len + 1
         self.log_z = log_z
 
-    def sample(self, num_samples, device):
-        action, log_prob, seq_length = self.sample_action(num_samples=num_samples, device=device)
+    def sample(self, num_samples, device, temp=1.):
+        action, log_prob, seq_length = self.sample_action(num_samples=num_samples, device=device, temp=temp)
         smiles = self.char_dict.matrix_to_smiles(action, seq_length - 1)
 
         return smiles, action, log_prob, seq_length
 
-    def sample_action(self, num_samples, device):
+    def sample_action(self, num_samples, device, temp=1.):
         number_batches = (
             num_samples + self.max_sampling_batch_size - 1
         ) // self.max_sampling_batch_size
@@ -125,7 +125,7 @@ class SmilesGeneratorHandler:
             batch_end = batch_start + batch_size
 
             action_batch, log_prob_batch, seq_length_batch = self._sample_action_batch(
-                batch_size, device
+                batch_size, device, temp
             )
             action[batch_start:batch_end, :] = action_batch
             log_prob[batch_start:batch_end, :] = log_prob_batch
@@ -271,7 +271,7 @@ class SmilesGeneratorHandler:
 
         return log_target_probs
 
-    def _sample_action_batch(self, batch_size, device):
+    def _sample_action_batch(self, batch_size, device, temp=1.):
         hidden = None
         inp = self._get_start_token_vector(batch_size, device)
 
@@ -284,7 +284,7 @@ class SmilesGeneratorHandler:
         for t in range(self.max_seq_length):
             output, hidden = self.model(inp, hidden)
 
-            prob = torch.softmax(output, dim=2)
+            prob = torch.softmax(output/temp, dim=2)
             distribution = Categorical(probs=prob)
             action_t = distribution.sample()
             log_prob_t = distribution.log_prob(action_t)

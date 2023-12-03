@@ -2,6 +2,8 @@ from functools import total_ordering
 import numpy as np
 import random
 
+MINIMUM = 1e-10
+
 
 @total_ordering
 class StorageElement:

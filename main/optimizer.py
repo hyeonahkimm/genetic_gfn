@@ -142,6 +142,8 @@ class Oracle:
                 # "best_mol": wandb.Image(Draw.MolsToGridImage([Chem.MolFromSmiles(item[0]) for item in temp_top10], 
                 #           molsPerRow=5, subImgSize=(200,200), legends=[f"f = {item[1][0]:.3f}, #oracle = {item[1][1]}" for item in temp_top10]))
             })
+            if n_calls > 9900:
+                print("auc_top10:", top_auc(self.mol_buffer, 10, finish, self.freq_log, self.max_oracle_calls))
         except:
             pass
 

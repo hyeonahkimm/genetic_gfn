@@ -63,7 +63,7 @@ class GeneticGFN_Optimizer(BaseOptimizer):
 
         # Prepare genetic expert
         if config["ga_chromosome"] == 'graph':
-            expert_handler = GraphGAOperatorHandler(mutation_rate=config['mutation_rate'], population_size=config['num_keep'])
+            expert_handler = GraphGAOperatorHandler(mutation_rate=config['mutation_rate'], population_size=config['expert_sampling_batch_size'], rank_based=config['rank_based'])
         else:
             expert_handler = GeneticOperatorHandler(mutation_rate=config['mutation_rate'])
         
@@ -104,9 +104,19 @@ class GeneticGFN_Optimizer(BaseOptimizer):
             apprentice_storage.squeeze_by_kth(k=config['num_keep'])
 
             # update_storage_by_expert
-            expert_smis, expert_scores = apprentice_storage.sample_batch(
-                config['expert_sampling_batch_size']
-            )
+            if config['sample_from_storage']:
+                expert_smis, expert_scores = apprentice_storage.sample_batch(
+                    config['expert_sampling_batch_size']
+                )
+            else:
+                apprentice_smis, apprentice_scores = apprentice_storage.get_elems()
+                if len(expert_storage) > 0:
+                    expert_smis, expert_scores = expert_storage.get_elems()
+                    expert_smis += apprentice_smis
+                    expert_scores += apprentice_scores
+                else:
+                    expert_smis = apprentice_smis
+                    expert_scores = apprentice_scores
             
             if config["ga_chromosome"] == 'graph':
                 mating_pool = (expert_smis, expert_scores)
