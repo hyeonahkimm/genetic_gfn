@@ -93,13 +93,14 @@ class SmilesGenerator(nn.Module):
 
 
 class SmilesGeneratorHandler:
-    def __init__(self, model, optimizer, char_dict, max_sampling_batch_size, entropy_factor=0.0):
+    def __init__(self, model, optimizer, char_dict, max_sampling_batch_size, entropy_factor=0.0, log_z=None):
         self.model = model
         self.optimizer = optimizer
         self.max_sampling_batch_size = max_sampling_batch_size
         self.entropy_factor = entropy_factor
         self.char_dict = char_dict
         self.max_seq_length = self.char_dict.max_smi_len + 1
+        self.log_z = log_z
 
     def sample(self, num_samples, device):
         action, log_prob, seq_length = self.sample_action(num_samples=num_samples, device=device)
@@ -167,6 +168,51 @@ class SmilesGeneratorHandler:
         if self.entropy_factor > 0.0:
             entropy = -torch.sum(torch.exp(log_probs) * log_probs, dim=1).mean()
             loss -= self.entropy_factor * entropy
+
+        self.model.zero_grad()
+        loss.backward()
+        nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+        self.optimizer.step()
+
+        return loss.item()
+
+    def train_tb(self, smis_scores, device, beta=1.):
+        smis = [s[0] for s in smis_scores]
+        scores = [s[1] for s in smis_scores]
+        actions, _ = smis_to_actions(self.char_dict, smis)
+        actions = torch.LongTensor(actions)
+        scores = torch.FloatTensor(scores)
+        loss = self.train_tb_on_action_batch(actions=actions, scores=scores, device=device, beta=beta)
+        return loss
+
+    def train_tb_on_action_batch(self, actions, scores, device, beta):
+        batch_size = actions.size(0)
+        batch_seq_length = actions.size(1)
+
+        actions = actions.to(device)
+        scores = scores.to(device)
+
+        start_token_vector = self._get_start_token_vector(batch_size, device)
+        input_actions = torch.cat([start_token_vector, actions[:, :-1]], dim=1)
+        target_actions = actions
+
+        input_actions = input_actions.to(device)
+        target_actions = target_actions.to(device)
+
+        output, _ = self.model(input_actions, hidden=None)
+        output = output.view(batch_size * batch_seq_length, -1)
+
+        log_probs = torch.log_softmax(output, dim=1)
+        log_target_probs = log_probs.gather(dim=1, index=target_actions.reshape(-1, 1)).squeeze(
+            dim=1
+        )
+        log_target_probs = log_target_probs.view(batch_size, batch_seq_length).mean(dim=1)
+
+        forward_flow = log_target_probs + self.log_z
+        backward_flow = scores*beta  # P_B = 1
+        
+        # print(forward_flow, backward_flow, self.log_z)
+        loss = torch.pow(forward_flow-backward_flow, 2).mean()
 
         self.model.zero_grad()
         loss.backward()

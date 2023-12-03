@@ -40,32 +40,28 @@ class GEGL_Optimizer(BaseOptimizer):
         # Prepare neural apprentice (we use the weights pretrained on existing dataset)
         apprentice = SmilesGenerator.load(load_dir=config['apprentice_load_dir'])
         apprentice = apprentice.to(device)
-        apprentice_optimizer = Adam(apprentice.parameters(), lr=config['learning_rate'])
+
+        if config['use_tb_loss']:
+            log_z = torch.nn.Parameter(torch.tensor([5.], device=device))
+            apprentice_optimizer = Adam([{'params': apprentice.parameters(), 
+                                         'lr': config['learning_rate']},
+                                        {'params': log_z, 
+                                         'lr': config['lr_z']}])
+        else:
+            log_z = None
+            apprentice_optimizer = Adam(apprentice.parameters(), lr=config['learning_rate'])
+        
         apprentice_handler = SmilesGeneratorHandler(
             model=apprentice,
             optimizer=apprentice_optimizer,
             char_dict=char_dict,
             max_sampling_batch_size=config['max_sampling_batch_size'],
+            log_z=log_z,
         )
         apprentice.train()
 
         # Prepare genetic expert
         expert_handler = GeneticOperatorHandler(mutation_rate=config['mutation_rate'])
-
-        # Prepare trainer that collect samples from the models & optimize the neural apprentice
-        # trainer = GeneticExpertGuidedLearningTrainer(
-        #     apprentice_storage=apprentice_storage,
-        #     expert_storage=expert_storage,
-        #     apprentice_handler=apprentice_handler,
-        #     expert_handler=expert_handler,
-        #     char_dict=char_dict,
-        #     num_keep=config['num_keep'],
-        #     apprentice_sampling_batch_size=config['apprentice_sampling_batch_size'],
-        #     expert_sampling_batch_size=config['expert_sampling_batch_size'],
-        #     apprentice_training_batch_size=config['apprentice_training_batch_size'],
-        #     num_apprentice_training_steps=config['num_apprentice_training_steps'],
-        #     init_smis=[],
-        # )
 
         pool = Parallel(n_jobs=config['num_jobs'])
 
@@ -89,6 +85,9 @@ class GEGL_Optimizer(BaseOptimizer):
             smis = list(set(smis))
             k = min((self.oracle.max_oracle_calls - len(self.oracle)), len(smis))
             smis = smis[:k]
+            
+            # if len(smis) < 50:
+            #     print(log_z, smis[-1])
 
             score = np.array(self.oracle(smis))
 
@@ -110,6 +109,9 @@ class GEGL_Optimizer(BaseOptimizer):
             smis = list(set(smis))  # 
             k = min((self.oracle.max_oracle_calls - len(self.oracle)), len(smis))
             smis = smis[:k]
+
+            # if len(smis) < 50:
+            #     print(smis[-1])
 
             score = np.array(self.oracle(smis))
 
@@ -135,14 +137,19 @@ class GEGL_Optimizer(BaseOptimizer):
 
             # train_apprentice_step
             avg_loss = 0.0
-            apprentice_smis, _ = apprentice_storage.get_elems()
-            expert_smis, _ = expert_storage.get_elems()
+            apprentice_smis, apprentice_scores = apprentice_storage.get_elems()
+            expert_smis, expert_scores = expert_storage.get_elems()
             total_smis = list(set(apprentice_smis + expert_smis))
+            total = [(smiles, score) for smiles, score in zip(apprentice_smis + expert_smis, apprentice_scores + expert_scores)]
 
             apprentice_handler.model.train()
             for _ in range(config['num_apprentice_training_steps']):
-                smis = random.choices(population=total_smis, k=config['apprentice_training_batch_size'])
-                loss = apprentice_handler.train_on_batch(smis=smis, device=device)
+                if config['use_tb_loss']:
+                    smis_scores = random.choices(population=total, k=config['apprentice_training_batch_size']) 
+                    loss = apprentice_handler.train_tb(smis_scores=smis_scores, device=device, beta=config['beta'])
+                else:
+                    smis = random.choices(population=total_smis, k=config['apprentice_training_batch_size'])
+                    loss = apprentice_handler.train_on_batch(smis=smis, device=device)
 
                 avg_loss += loss / config['num_apprentice_training_steps']
 

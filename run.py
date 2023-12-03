@@ -116,6 +116,8 @@ def main():
         from main.graphinvent.run import GraphInvent_Optimizer as Optimizer
     elif args.method == "rationale_rl":
         from main.rationale_rl.run import Rationale_RL_Optimizer as Optimizer
+    elif args.method == "genetic_gfn":
+        from main.genetic_gfn.run import GeneticGFN_Optimizer as Optimizer
     else:
         raise ValueError("Unrecognized method name.")
 

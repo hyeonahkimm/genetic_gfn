@@ -47,7 +47,8 @@ def smis_to_actions(char_dict, smis):
     seq_lengths = np.zeros((len(smis),), dtype=np.long)
 
     for i, enc_smi in list(enumerate(enc_smis)):
-        for c in range(len(enc_smi)):
+        for c in range(min(max_seq_length, len(enc_smi))):  # len(enc_smi) > max_seq_length
+        # for c in range(len(enc_smi)):
             try:
                 actions[i, c] = char_dict.char_idx[enc_smi[c]]
             except:
