@@ -9,6 +9,6 @@ do
 for oralce in "${oracle_array[@]}"
 do
 # echo $oralce
-CUDA_VISIBLE_DEVICES=0 python run.py genetic_gfn --task simple --oracle $oralce --wandb online --run_name low_beta --seed $seed --config_default 'hparams_graph_rank.yaml'
+CUDA_VISIBLE_DEVICES=0 python run.py genetic_gfn --task simple --oracle $oralce --wandb online --run_name rank3 --seed $seed --config_default 'hparams_graph_rank_large.yaml'
 done
 done
