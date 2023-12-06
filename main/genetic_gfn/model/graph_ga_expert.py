@@ -43,7 +43,10 @@ def make_mating_pool(population_mol: List[Mol], population_scores, offspring_siz
         population_scores = [s + MINIMUM for s in population_scores]
         sum_scores = sum(population_scores)
         population_probs = [p / sum_scores for p in population_scores]
-        mating_pool = np.random.choice(population_mol, p=population_probs, size=offspring_size, replace=True)
+        # mating_pool = np.random.choice(population_mol, p=population_probs, size=offspring_size, replace=True)
+        indices = np.random.choice(np.arange(len(population_mol)), p=population_probs, size=offspring_size, replace=True)
+        mating_pool = [population_mol[i] for i in indices if population_mol[i] is not None]
+        mating_pool_score = [population_scores[i] for i in indices if population_mol[i] is not None]
 
     if return_pop:
         return mating_pool, mating_pool_score

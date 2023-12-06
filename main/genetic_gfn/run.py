@@ -124,7 +124,7 @@ class GeneticGFN_Optimizer(BaseOptimizer):
                 else:
                     smis, population_mol, population_scores = expert_handler.query(
                         # query_size=50, mating_pool=mating_pool, pool=pool, return_pop=True
-                        query_size=config['ga_offspring_size'], mating_pool=mating_pool, pool=pool, rank_based=True, return_pop=True
+                        query_size=config['ga_offspring_size'], mating_pool=mating_pool, pool=pool, rank_based=(gen==0), return_pop=True
                     )
 
                 smis = list(set(smis))
