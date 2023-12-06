@@ -97,7 +97,7 @@ def change_atom(mol):
     return '[X:1]>>[Y:1]'.replace('X', X).replace('Y', Y)
 
 
-def mutate(mol, mutation_rate):
+def mutate(mol, mutation_rate=0.01):
     if random.random() > mutation_rate:
         return mol
 

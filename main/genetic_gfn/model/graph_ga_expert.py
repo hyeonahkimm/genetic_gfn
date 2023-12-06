@@ -18,7 +18,7 @@ import gc
 
 MINIMUM = 1e-10
 
-def make_mating_pool(population_mol: List[Mol], population_scores, offspring_size: int, rank_based=False):
+def make_mating_pool(population_mol: List[Mol], population_scores, offspring_size: int, rank_based=False, return_pop=False):
     """
     Given a population of RDKit Mol and their scores, sample a list of the same size
     with replacement using the population_scores as weights
@@ -37,6 +37,56 @@ def make_mating_pool(population_mol: List[Mol], population_scores, offspring_siz
             weights=weights, num_samples=offspring_size, replacement=True
             ))
         mating_pool = [population_mol[i] for i in indices if population_mol[i] is not None]
+        mating_pool_score = [population_scores[i] for i in indices if population_mol[i] is not None]
+        # print(mating_pool)
+    else:
+        population_scores = [s + MINIMUM for s in population_scores]
+        sum_scores = sum(population_scores)
+        population_probs = [p / sum_scores for p in population_scores]
+        mating_pool = np.random.choice(population_mol, p=population_probs, size=offspring_size, replace=True)
+
+    if return_pop:
+        return mating_pool, mating_pool_score
+
+    return mating_pool, None
+
+
+def make_blended_mating_pool(population_mol: List[Mol], population_scores, offspring_size: int, rank_based=False, frac_graph_ga_mutate=0.1):
+    """
+    Given a population of RDKit Mol and their scores, sample a list of the same size
+    with replacement using the population_scores as weights
+    Args:
+        population_mol: list of RDKit Mol
+        population_scores: list of un-normalised scores given by ScoringFunction
+        offspring_size: number of molecules to return
+    Returns: a list of RDKit Mol (probably not unique)
+    """
+    # scores -> probs 
+    if rank_based:
+        scores_np = np.array(population_scores)
+        ranks = np.argsort(np.argsort(-1 * scores_np))
+        weights = 1.0 / (1e-3 * len(scores_np) + ranks)
+        indices = list(torch.utils.data.WeightedRandomSampler(
+            weights=weights, num_samples=offspring_size, replacement=True
+            ))
+        mating_pool = [population_mol[i] for i in indices if population_mol[i] is not None]
+        
+        mutate_mating_pool, crossover_mating_pool = [], []
+        mutate_mating_score, crossover_mating_score = [], []
+        for i in indices:
+            if population_mol[i] is not None:
+                if np.random.rand(1) < frac_graph_ga_mutate and len(mutate_mating_pool) < int(offspring_size * frac_graph_ga_mutate) + 1:
+                    mutate_mating_pool.append(population_mol[i])
+                    mutate_mating_score.append(population_scores[i])
+                else:
+                    crossover_mating_pool.append(population_mol[i])
+                    crossover_mating_score.append(population_scores[i])
+
+        # print(crossover_mating_pool)
+        # crossover_mating_pool = random.shuffle(crossover_mating_pool)
+
+        return mutate_mating_pool, crossover_mating_pool, mutate_mating_score, crossover_mating_score
+
         # print(mating_pool)
     else:
         population_scores = [s + MINIMUM for s in population_scores]
@@ -69,16 +119,14 @@ class GeneticOperatorHandler:
         self.population_size = population_size
         self.rank_based = rank_based
 
-    def query(self, query_size, mating_pool, pool):
+    def query(self, query_size, mating_pool, pool, rank_based=True, return_pop=False):
         # print(mating_pool)
         population_mol = [Chem.MolFromSmiles(s) for s in mating_pool[0]]
         population_scores = mating_pool[1]
 
-        new_mating_pool = make_mating_pool(population_mol, population_scores, self.population_size, self.rank_based)
-        offspring_mol = pool(delayed(reproduce)(new_mating_pool, self.mutation_rate) for _ in range(query_size))
+        new_mating_pool, new_mating_scores = make_mating_pool(population_mol, population_scores, self.population_size, rank_based, return_pop)
 
-        # add new_population
-        # population_mol += offspring_mol
+        offspring_mol = pool(delayed(reproduce)(new_mating_pool, self.mutation_rate) for _ in range(query_size))
 
         smis = []
         for m in offspring_mol:
@@ -86,13 +134,48 @@ class GeneticOperatorHandler:
                 smis.append(Chem.MolToSmiles(m, canonical=True))
             except:
                 pass
-        # smis = [Chem.MolToSmiles(m, canonical=True) for m in offspring_mol]
-        # smis = random.choices(mating_pool, k=query_size * 2)
-        # smi0s, smi1s = smis[:query_size], smis[query_size:]
-        # smis = pool(
-        #     delayed(reproduce)(smi0, smi1, self.mutation_rate) for smi0, smi1 in zip(smi0s, smi1s)
-        # )
-        # smis = list(filter(lambda smi: smi is not None, smis))
+
         gc.collect()
 
-        return smis
+        if return_pop:
+            pop_valid_smis, pop_valid_scores = [], []
+            for m, s in zip(new_mating_pool, new_mating_scores):
+                try:
+                    pop_valid_smis.append(Chem.MolToSmiles(m, canonical=True))
+                    pop_valid_scores.append(s)
+                except:
+                    pass
+            return smis, pop_valid_smis, pop_valid_scores
+
+        return smis, None, None
+
+    def blended_query(self, query_size, mating_pool, pool, frac_graph_ga_mutate=0.1, rank_based=True, return_pop=False):
+        population_mol = [Chem.MolFromSmiles(s) for s in mating_pool[0]]
+        population_scores = mating_pool[1]
+
+        mut_mating_pool, cross_mating_pool, mut_mating_score, cross_mating_score = make_blended_mating_pool(population_mol, population_scores, self.population_size, rank_based, frac_graph_ga_mutate)
+
+        mut_offspring_mol = mu.mutate(mut_mating_pool, mutation_rate=0.)
+        cross_offspring_mol = pool(delayed(reproduce)(cross_mating_pool, self.mutation_rate) for _ in range(query_size))
+
+        smis = []
+        for m in mut_offspring_mol + cross_offspring_mol:
+            try:
+                smis.append(Chem.MolToSmiles(m, canonical=True))
+            except:
+                pass
+        
+        gc.collect()
+
+        if return_pop:
+            pop_valid_smis, pop_valid_scores = [], []
+            for m, s in zip(mut_mating_pool+cross_mating_pool, mut_mating_score+cross_mating_score):
+                try:
+                    pop_valid_smis.append(Chem.MolToSmiles(m, canonical=True))
+                    pop_valid_scores.append(s)
+                except:
+                    pass
+            return smis, pop_valid_smis, pop_valid_scores
+            
+        return smis, None, None
+
