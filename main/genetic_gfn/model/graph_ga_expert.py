@@ -18,7 +18,7 @@ import gc
 
 MINIMUM = 1e-10
 
-def make_mating_pool(population_mol: List[Mol], population_scores, offspring_size: int, rank_based=False, return_pop=False):
+def make_mating_pool(population_mol: List[Mol], population_scores, offspring_size: int, rank_based=False, return_pop=False, replace=True):
     """
     Given a population of RDKit Mol and their scores, sample a list of the same size
     with replacement using the population_scores as weights
@@ -44,7 +44,7 @@ def make_mating_pool(population_mol: List[Mol], population_scores, offspring_siz
         sum_scores = sum(population_scores)
         population_probs = [p / sum_scores for p in population_scores]
         # mating_pool = np.random.choice(population_mol, p=population_probs, size=offspring_size, replace=True)
-        indices = np.random.choice(np.arange(len(population_mol)), p=population_probs, size=offspring_size, replace=True)
+        indices = np.random.choice(np.arange(len(population_mol)), p=population_probs, size=offspring_size, replace=replace)
         mating_pool = [population_mol[i] for i in indices if population_mol[i] is not None]
         mating_pool_score = [population_scores[i] for i in indices if population_mol[i] is not None]
 
@@ -72,32 +72,31 @@ def make_blended_mating_pool(population_mol: List[Mol], population_scores, offsp
         indices = list(torch.utils.data.WeightedRandomSampler(
             weights=weights, num_samples=offspring_size, replacement=True
             ))
-        mating_pool = [population_mol[i] for i in indices if population_mol[i] is not None]
+        # mating_pool = [population_mol[i] for i in indices if population_mol[i] is not None]
         
-        mutate_mating_pool, crossover_mating_pool = [], []
-        mutate_mating_score, crossover_mating_score = [], []
-        for i in indices:
-            if population_mol[i] is not None:
-                if np.random.rand(1) < frac_graph_ga_mutate and len(mutate_mating_pool) < int(offspring_size * frac_graph_ga_mutate) + 1:
-                    mutate_mating_pool.append(population_mol[i])
-                    mutate_mating_score.append(population_scores[i])
-                else:
-                    crossover_mating_pool.append(population_mol[i])
-                    crossover_mating_score.append(population_scores[i])
-
-        # print(crossover_mating_pool)
-        # crossover_mating_pool = random.shuffle(crossover_mating_pool)
-
-        return mutate_mating_pool, crossover_mating_pool, mutate_mating_score, crossover_mating_score
-
         # print(mating_pool)
     else:
         population_scores = [s + MINIMUM for s in population_scores]
         sum_scores = sum(population_scores)
         population_probs = [p / sum_scores for p in population_scores]
-        mating_pool = np.random.choice(population_mol, p=population_probs, size=offspring_size, replace=True)
+        # mating_pool = np.random.choice(population_mol, p=population_probs, size=offspring_size, replace=True)
+        indices = np.random.choice(np.arange(len(population_mol)), p=population_probs, size=offspring_size, replace=True)
 
-    return mating_pool
+    mutate_mating_pool, crossover_mating_pool = [], []
+    mutate_mating_score, crossover_mating_score = [], []
+    for i in indices:
+        if population_mol[i] is not None:
+            if np.random.rand(1) < frac_graph_ga_mutate and len(mutate_mating_pool) < int(offspring_size * frac_graph_ga_mutate) + 1:
+                mutate_mating_pool.append(population_mol[i])
+                mutate_mating_score.append(population_scores[i])
+            else:
+                crossover_mating_pool.append(population_mol[i])
+                crossover_mating_score.append(population_scores[i])
+
+    # print(crossover_mating_pool)
+    # crossover_mating_pool = random.shuffle(crossover_mating_pool)
+
+    return mutate_mating_pool, crossover_mating_pool, mutate_mating_score, crossover_mating_score
 
 
 def reproduce(mating_pool, mutation_rate):
@@ -121,6 +120,10 @@ class GeneticOperatorHandler:
         self.mutation_rate = mutation_rate
         self.population_size = population_size
         self.rank_based = rank_based
+
+    def get_final_population(self, mating_pool, rank_based=False):
+        new_mating_pool, new_mating_scores = make_mating_pool(mating_pool[0], mating_pool[1], self.population_size, rank_based, return_pop=True, replace=False)
+        return (new_mating_pool, new_mating_scores)
 
     def query(self, query_size, mating_pool, pool, rank_based=True, return_pop=False):
         # print(mating_pool)

@@ -85,9 +85,6 @@ class GeneticGFN_Optimizer(BaseOptimizer):
             smis = list(set(smis))
             k = min((self.oracle.max_oracle_calls - len(self.oracle)), len(smis))
             smis = smis[:k]
-            
-            # if len(smis) < 50:
-            #     print(log_z, smis[-1])
 
             score = np.array(self.oracle(smis))
 
@@ -133,7 +130,6 @@ class GeneticGFN_Optimizer(BaseOptimizer):
                 score = np.array(self.oracle(smis))
 
                 mating_pool = (population_mol + smis, population_scores + score.tolist())
-                # print(mating_pool)
 
                 if self.finish:
                     print('max oracle hit')
@@ -152,7 +148,10 @@ class GeneticGFN_Optimizer(BaseOptimizer):
                 else:
                     patience = 0
 
-            expert_storage.add_list(smis=smis, scores=score)
+            # if config['ga_generation'] > 1:
+            #     smis, score = expert_handler.get_final_population(self, mating_pool)
+
+            expert_storage.add_list(smis=smis, scores=score)  # expert_storage.add_list(smis=smis, scores=score)
             expert_storage.squeeze_by_kth(k=config['num_keep'])
 
             # train_apprentice_step
