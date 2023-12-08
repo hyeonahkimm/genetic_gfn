@@ -34,7 +34,7 @@ def make_mating_pool(population_mol: List[Mol], population_scores, offspring_siz
         ranks = np.argsort(np.argsort(-1 * scores_np))
         weights = 1.0 / (1e-3 * len(scores_np) + ranks)
         indices = list(torch.utils.data.WeightedRandomSampler(
-            weights=weights, num_samples=offspring_size, replacement=True
+            weights=weights, num_samples=offspring_size, replacement=replace
             ))
         mating_pool = [population_mol[i] for i in indices if population_mol[i] is not None]
         mating_pool_score = [population_scores[i] for i in indices if population_mol[i] is not None]

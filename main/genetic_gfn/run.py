@@ -121,7 +121,7 @@ class GeneticGFN_Optimizer(BaseOptimizer):
                 else:
                     smis, population_mol, population_scores = expert_handler.query(
                         # query_size=50, mating_pool=mating_pool, pool=pool, return_pop=True
-                        query_size=config['ga_offspring_size'], mating_pool=mating_pool, pool=pool, rank_based=(gen==0), return_pop=True
+                        query_size=config['ga_offspring_size'], mating_pool=mating_pool, pool=pool, rank_based=True, return_pop=True
                     )
 
                 smis = list(set(smis))
@@ -148,10 +148,10 @@ class GeneticGFN_Optimizer(BaseOptimizer):
                 else:
                     patience = 0
 
-            # if config['ga_generation'] > 1:
-            #     smis, score = expert_handler.get_final_population(self, mating_pool)
+            if config['ga_generation'] > 1:
+                smis, score = expert_handler.get_final_population(mating_pool, rank_based=True)
 
-            expert_storage.add_list(smis=smis, scores=score)  # expert_storage.add_list(smis=smis, scores=score)
+            expert_storage.add_list(smis=smis, scores=score)
             expert_storage.squeeze_by_kth(k=config['num_keep'])
 
             # train_apprentice_step

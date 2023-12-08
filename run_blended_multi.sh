@@ -11,6 +11,6 @@ do
 for oralce in "${oracle_array[@]}"
 do
 # echo $oralce
-CUDA_VISIBLE_DEVICES=5 python run.py genetic_gfn --task simple --config_default 'hparams_graph_blended_multi.yaml' --oracle $oralce --wandb online --run_name gen1_blended --seed $seed
+python run.py genetic_gfn --task simple --config_default 'hparams_graph_blended_multi.yaml' --oracle $oralce --wandb online --run_name nank_gen3_blended --seed $seed
 done
 done
