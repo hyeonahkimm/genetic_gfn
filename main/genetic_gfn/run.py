@@ -87,6 +87,7 @@ class GeneticGFN_Optimizer(BaseOptimizer):
             smis = smis[:k]
 
             score = np.array(self.oracle(smis))
+            # div = self.oracle.diversity_evaluator(smis)
 
             if self.finish:
                 print('max oracle hit')
@@ -116,7 +117,7 @@ class GeneticGFN_Optimizer(BaseOptimizer):
 
                 if config['ga_blended']:
                     smis, population_mol, population_scores = expert_handler.blended_query(
-                        query_size=config['ga_offspring_size'], mating_pool=mating_pool, pool=pool, rank_based=True, return_pop=True
+                        query_size=config['ga_offspring_size'], mating_pool=mating_pool, pool=pool, rank_based=(gen==0), return_pop=True
                     )
                 else:
                     smis, population_mol, population_scores = expert_handler.query(
@@ -149,7 +150,7 @@ class GeneticGFN_Optimizer(BaseOptimizer):
                     patience = 0
 
             if config['ga_generation'] > 1:
-                smis, score = expert_handler.get_final_population(mating_pool, rank_based=True)
+                smis, score = expert_handler.get_final_population(mating_pool, rank_based=False)
 
             expert_storage.add_list(smis=smis, scores=score)
             expert_storage.squeeze_by_kth(k=config['num_keep'])
@@ -164,14 +165,18 @@ class GeneticGFN_Optimizer(BaseOptimizer):
             apprentice_handler.model.train()
             for _ in range(config['num_apprentice_training_steps']):
                 if config['use_tb_loss']:
-                    loss = 0.
-                    training_steps = len(total) // config['apprentice_training_batch_size']
-                    random.shuffle(total)
-                    for step in range(int(training_steps)):
-                        start_idx = step * config['apprentice_training_batch_size']
-                        smis_scores = total[start_idx : start_idx + config['apprentice_training_batch_size']]
-                        # smis_scores = random.choices(population=total, k=config['apprentice_training_batch_size']) 
-                        loss += apprentice_handler.train_tb(smis_scores=smis_scores, device=device, beta=config['beta']) / training_steps
+                    # sampled_smis, sampled_score = expert_handler.get_final_population((apprentice_smis + expert_smis, apprentice_scores + expert_scores), rank_based=True)
+                    # smis_scores = [(smiles, score) for smiles, score in zip(sampled_smis, sampled_score)]
+                    smis_scores = random.choices(population=total, k=config['apprentice_training_batch_size'])
+                    loss = apprentice_handler.train_tb(smis_scores=smis_scores, device=device, beta=config['beta'])
+                    # loss = 0.
+                    # training_steps = len(total) // config['apprentice_training_batch_size']
+                    # random.shuffle(total)
+                    # for step in range(int(training_steps)):
+                    #     start_idx = step * config['apprentice_training_batch_size']
+                    #     smis_scores = total[start_idx : start_idx + config['apprentice_training_batch_size']]
+                    #     # smis_scores = random.choices(population=total, k=config['apprentice_training_batch_size']) 
+                    #     loss += apprentice_handler.train_tb(smis_scores=smis_scores, device=device, beta=config['beta']) / training_steps
                 else:
                     smis = random.choices(population=total_smis, k=config['apprentice_training_batch_size'])
                     loss = apprentice_handler.train_on_batch(smis=smis, device=device)

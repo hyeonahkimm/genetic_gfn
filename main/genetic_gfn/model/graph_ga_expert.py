@@ -54,7 +54,7 @@ def make_mating_pool(population_mol: List[Mol], population_scores, offspring_siz
     return mating_pool, None
 
 
-def make_blended_mating_pool(population_mol: List[Mol], population_scores, offspring_size: int, rank_based=False, frac_graph_ga_mutate=0.1):
+def make_blended_mating_pool(population_mol: List[Mol], population_scores, offspring_size: int, rank_based=False, frac_graph_ga_mutate=0.1, replace=True):
     """
     Given a population of RDKit Mol and their scores, sample a list of the same size
     with replacement using the population_scores as weights
@@ -70,7 +70,7 @@ def make_blended_mating_pool(population_mol: List[Mol], population_scores, offsp
         ranks = np.argsort(np.argsort(-1 * scores_np))
         weights = 1.0 / (1e-3 * len(scores_np) + ranks)
         indices = list(torch.utils.data.WeightedRandomSampler(
-            weights=weights, num_samples=offspring_size, replacement=True
+            weights=weights, num_samples=offspring_size, replacement=replace
             ))
         # mating_pool = [population_mol[i] for i in indices if population_mol[i] is not None]
         
@@ -80,7 +80,7 @@ def make_blended_mating_pool(population_mol: List[Mol], population_scores, offsp
         sum_scores = sum(population_scores)
         population_probs = [p / sum_scores for p in population_scores]
         # mating_pool = np.random.choice(population_mol, p=population_probs, size=offspring_size, replace=True)
-        indices = np.random.choice(np.arange(len(population_mol)), p=population_probs, size=offspring_size, replace=True)
+        indices = np.random.choice(np.arange(len(population_mol)), p=population_probs, size=offspring_size, replace=replace)
 
     mutate_mating_pool, crossover_mating_pool = [], []
     mutate_mating_score, crossover_mating_score = [], []
@@ -159,7 +159,7 @@ class GeneticOperatorHandler:
         population_mol = [Chem.MolFromSmiles(s) for s in mating_pool[0]]
         population_scores = mating_pool[1]
 
-        mut_mating_pool, cross_mating_pool, mut_mating_score, cross_mating_score = make_blended_mating_pool(population_mol, population_scores, self.population_size, rank_based, frac_graph_ga_mutate)
+        mut_mating_pool, cross_mating_pool, mut_mating_score, cross_mating_score = make_blended_mating_pool(population_mol, population_scores, self.population_size, rank_based, frac_graph_ga_mutate, replace=True)
 
         mut_offspring_mol = mu.mutate(mut_mating_pool, mutation_rate=0.)
         cross_offspring_mol = pool(delayed(reproduce)(cross_mating_pool, self.mutation_rate) for _ in range(query_size))
