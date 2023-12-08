@@ -118,6 +118,8 @@ def main():
         from main.rationale_rl.run import Rationale_RL_Optimizer as Optimizer
     elif args.method == "genetic_gfn":
         from main.genetic_gfn.run import GeneticGFN_Optimizer as Optimizer
+    elif args.method == "mol_ga":
+        from main.mol_ga.run import MolGAOptimizer as Optimizer
     else:
         raise ValueError("Unrecognized method name.")
 
