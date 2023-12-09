@@ -8,6 +8,8 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 from joblib import Parallel
 
+from rdkit import Chem
+
 from main.optimizer import BaseOptimizer
 from runner.gegl_trainer import GeneticExpertGuidedLearningTrainer
 from runner.guacamol_generator import GeneticExpertGuidedLearningGenerator
@@ -17,6 +19,20 @@ from util.storage.priority_queue import MaxRewardPriorityQueue
 from util.storage.recorder import Recorder
 from util.chemistry.benchmarks import load_benchmark
 from util.smiles.char_dict import SmilesCharDictionary
+
+
+def sanitize(smils_list, invalid_accept_rate=0.5):
+    smils_list = list(set(smils_list))
+    filtered = []
+    for s in smils_list:
+        try:
+            Chem.MolFromSmiles(s)
+            filtered.append(s)
+        except:
+            if np.random.rand(1) < invalid_accept_rate:
+                filtered.append(s)
+
+    return filtered
 
 
 class GeneticGFN_Optimizer(BaseOptimizer):
@@ -67,6 +83,8 @@ class GeneticGFN_Optimizer(BaseOptimizer):
 
         step = 0
         patience = 0
+        prev_max = 0.
+        delta_score = 0.
 
         while True:
             if len(self.oracle) > 100:
@@ -79,14 +97,19 @@ class GeneticGFN_Optimizer(BaseOptimizer):
             with torch.no_grad():
                 apprentice_handler.model.eval()
                 smis, _, _, _ = apprentice_handler.sample(
-                    num_samples=config['apprentice_sampling_batch_size'], device=device
+                    num_samples=config['apprentice_sampling_batch_size'], device=device, #temp= 0.5 * self.oracle.current_div #1. + float(delta_score == 0.)
                 )
             
             smis = list(set(smis))
+            # smis = sanitize(smis, 0.)
             k = min((self.oracle.max_oracle_calls - len(self.oracle)), len(smis))
             smis = smis[:k]
 
             score = np.array(self.oracle(smis))
+            delta_score = score.max() - prev_max
+            if prev_max < score.max():
+                prev_max = score.max()
+            # print('NN:', score.max(), score.mean(), score.std(), len(smis))
             # div = self.oracle.diversity_evaluator(smis)
 
             if self.finish:
@@ -117,18 +140,22 @@ class GeneticGFN_Optimizer(BaseOptimizer):
 
                 if config['ga_blended']:
                     smis, population_mol, population_scores = expert_handler.blended_query(
-                        query_size=config['ga_offspring_size'], mating_pool=mating_pool, pool=pool, rank_based=(gen==0), return_pop=True
+                        query_size=config['ga_offspring_size'], mating_pool=mating_pool, pool=pool, rank_based=True, return_pop=True
                     )
                 else:
                     smis, population_mol, population_scores = expert_handler.query(
                         # query_size=50, mating_pool=mating_pool, pool=pool, return_pop=True
-                        query_size=config['ga_offspring_size'], mating_pool=mating_pool, pool=pool, rank_based=True, return_pop=True
+                        query_size=config['ga_offspring_size'], mating_pool=mating_pool, pool=pool, rank_based=config['rank_based'], return_pop=True
                     )
 
                 smis = list(set(smis))
                 k = min((self.oracle.max_oracle_calls - len(self.oracle)), len(smis))
                 smis = smis[:k]
                 score = np.array(self.oracle(smis))
+                # print('GA ' + str(gen+1) +':', score.max(), score.mean(), score.std(), len(score))
+                # delta_score = score.max() - prev_max
+                if prev_max < score.max():
+                    prev_max = score.max()
 
                 mating_pool = (population_mol + smis, population_scores + score.tolist())
 
@@ -165,7 +192,7 @@ class GeneticGFN_Optimizer(BaseOptimizer):
             apprentice_handler.model.train()
             for _ in range(config['num_apprentice_training_steps']):
                 if config['use_tb_loss']:
-                    # sampled_smis, sampled_score = expert_handler.get_final_population((apprentice_smis + expert_smis, apprentice_scores + expert_scores), rank_based=True)
+                    # sampled_smis, sampled_score = expert_handler.get_final_population((apprentice_smis + expert_smis, apprentice_scores + expert_scores), rank_based=False)
                     # smis_scores = [(smiles, score) for smiles, score in zip(sampled_smis, sampled_score)]
                     smis_scores = random.choices(population=total, k=config['apprentice_training_batch_size'])
                     loss = apprentice_handler.train_tb(smis_scores=smis_scores, device=device, beta=config['beta'])

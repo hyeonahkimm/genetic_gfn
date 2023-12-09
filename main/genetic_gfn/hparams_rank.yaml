@@ -16,6 +16,6 @@ beta: 500
 ga_chromosome: graph
 sample_from_storage: False
 rank_based: True
-ga_blended: False
+ga_blended: True
 ga_generation: 3
 ga_offspring_size: 50

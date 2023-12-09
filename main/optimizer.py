@@ -64,6 +64,7 @@ class Oracle:
         self.sa_scorer = tdc.Oracle(name = 'SA')
         self.diversity_evaluator = tdc.Evaluator(name = 'Diversity')
         self.last_log = 0
+        self.current_div = 1.
 
     @property
     def budget(self):
@@ -120,6 +121,8 @@ class Oracle:
         avg_top100 = np.mean(scores)
         avg_sa = np.mean(self.sa_scorer(smis))
         diversity_top100 = self.diversity_evaluator(smis)
+
+        self.current_div = diversity_top100
         
         print(f'{n_calls}/{self.max_oracle_calls} | '
                 f'avg_top1: {avg_top1:.3f} | '

@@ -121,16 +121,16 @@ class GeneticOperatorHandler:
         self.population_size = population_size
         self.rank_based = rank_based
 
-    def get_final_population(self, mating_pool, rank_based=False):
-        new_mating_pool, new_mating_scores = make_mating_pool(mating_pool[0], mating_pool[1], self.population_size, rank_based, return_pop=True, replace=False)
+    def get_final_population(self, mating_pool, rank_based=False, replace=False):
+        new_mating_pool, new_mating_scores = make_mating_pool(mating_pool[0], mating_pool[1], self.population_size, rank_based, return_pop=True, replace=replace)
         return (new_mating_pool, new_mating_scores)
 
-    def query(self, query_size, mating_pool, pool, rank_based=True, return_pop=False):
+    def query(self, query_size, mating_pool, pool, rank_based=True, return_pop=False, replace=True):
         # print(mating_pool)
         population_mol = [Chem.MolFromSmiles(s) for s in mating_pool[0]]
         population_scores = mating_pool[1]
 
-        new_mating_pool, new_mating_scores = make_mating_pool(population_mol, population_scores, self.population_size, rank_based, return_pop)
+        new_mating_pool, new_mating_scores = make_mating_pool(population_mol, population_scores, self.population_size, rank_based, return_pop, replace)
 
         offspring_mol = pool(delayed(reproduce)(new_mating_pool, self.mutation_rate) for _ in range(query_size))
 
@@ -155,11 +155,11 @@ class GeneticOperatorHandler:
 
         return smis, None, None
 
-    def blended_query(self, query_size, mating_pool, pool, frac_graph_ga_mutate=0.1, rank_based=True, return_pop=False):
+    def blended_query(self, query_size, mating_pool, pool, frac_graph_ga_mutate=0.1, rank_based=True, return_pop=False, replace=True):
         population_mol = [Chem.MolFromSmiles(s) for s in mating_pool[0]]
         population_scores = mating_pool[1]
 
-        mut_mating_pool, cross_mating_pool, mut_mating_score, cross_mating_score = make_blended_mating_pool(population_mol, population_scores, self.population_size, rank_based, frac_graph_ga_mutate, replace=True)
+        mut_mating_pool, cross_mating_pool, mut_mating_score, cross_mating_score = make_blended_mating_pool(population_mol, population_scores, self.population_size, rank_based, frac_graph_ga_mutate, replace=replace)
 
         mut_offspring_mol = mu.mutate(mut_mating_pool, mutation_rate=0.)
         cross_offspring_mol = pool(delayed(reproduce)(cross_mating_pool, self.mutation_rate) for _ in range(query_size))
