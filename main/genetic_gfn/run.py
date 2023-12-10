@@ -109,7 +109,7 @@ class GeneticGFN_Optimizer(BaseOptimizer):
             delta_score = score.max() - prev_max
             if prev_max < score.max():
                 prev_max = score.max()
-            # print('NN:', score.max(), score.mean(), score.std(), len(smis))
+            print('NN:', score.max(), score.mean(), score.std(), len(smis))
             # div = self.oracle.diversity_evaluator(smis)
 
             if self.finish:
@@ -140,19 +140,19 @@ class GeneticGFN_Optimizer(BaseOptimizer):
 
                 if config['ga_blended']:
                     smis, population_mol, population_scores = expert_handler.blended_query(
-                        query_size=config['ga_offspring_size'], mating_pool=mating_pool, pool=pool, rank_based=config['rank_based'], return_pop=True
+                        query_size=config['ga_offspring_size'], mating_pool=mating_pool, pool=pool, rank_based=(gen==0), return_pop=True
                     )
                 else:
                     smis, population_mol, population_scores = expert_handler.query(
                         # query_size=50, mating_pool=mating_pool, pool=pool, return_pop=True
-                        query_size=config['ga_offspring_size'], mating_pool=mating_pool, pool=pool, rank_based=config['rank_based'], return_pop=True
+                        query_size=config['ga_offspring_size'], mating_pool=mating_pool, pool=pool, rank_based=(gen==0), return_pop=True
                     )
 
                 smis = list(set(smis))
                 k = min((self.oracle.max_oracle_calls - len(self.oracle)), len(smis))
                 smis = smis[:k]
                 score = np.array(self.oracle(smis))
-                # print('GA ' + str(gen+1) +':', score.max(), score.mean(), score.std(), len(score))
+                print('GA ' + str(gen+1) +':', score.max(), score.mean(), score.std(), len(score))
                 # delta_score = score.max() - prev_max
                 if prev_max < score.max():
                     prev_max = score.max()
@@ -177,7 +177,7 @@ class GeneticGFN_Optimizer(BaseOptimizer):
                     patience = 0
 
             if config['ga_generation'] > 1:
-                smis, score = expert_handler.get_final_population(mating_pool, rank_based=False)
+                smis, score = expert_handler.get_final_population(mating_pool, rank_based=True)
 
             expert_storage.add_list(smis=smis, scores=score)
             expert_storage.squeeze_by_kth(k=config['num_keep'])
@@ -192,9 +192,9 @@ class GeneticGFN_Optimizer(BaseOptimizer):
             apprentice_handler.model.train()
             for _ in range(config['num_apprentice_training_steps']):
                 if config['use_tb_loss']:
-                    # sampled_smis, sampled_score = expert_handler.get_final_population((apprentice_smis + expert_smis, apprentice_scores + expert_scores), rank_based=False)
-                    # smis_scores = [(smiles, score) for smiles, score in zip(sampled_smis, sampled_score)]
-                    smis_scores = random.choices(population=total, k=config['apprentice_training_batch_size'])
+                    sampled_smis, sampled_score = expert_handler.get_final_population((apprentice_smis + expert_smis, apprentice_scores + expert_scores), rank_based=True, replace=True)
+                    smis_scores = [(smiles, score) for smiles, score in zip(sampled_smis, sampled_score)]
+                    # smis_scores = random.choices(population=total, k=config['apprentice_training_batch_size'])
                     loss = apprentice_handler.train_tb(smis_scores=smis_scores, device=device, beta=config['beta'])
                     # loss = 0.
                     # training_steps = len(total) // config['apprentice_training_batch_size']

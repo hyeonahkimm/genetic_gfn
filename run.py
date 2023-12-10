@@ -116,6 +116,8 @@ def main():
         from main.graphinvent.run import GraphInvent_Optimizer as Optimizer
     elif args.method == "rationale_rl":
         from main.rationale_rl.run import Rationale_RL_Optimizer as Optimizer
+    elif args.method == "reinvent_ga":
+        from main.reinvent_ga.run import REINVENT_GA_Optimizer as Optimizer
     elif args.method == "genetic_gfn":
         from main.genetic_gfn.run import GeneticGFN_Optimizer as Optimizer
     elif args.method == "mol_ga":
