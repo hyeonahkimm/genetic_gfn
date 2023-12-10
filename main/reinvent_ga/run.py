@@ -135,21 +135,25 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                 # print(list(self.oracle.mol_buffer))
                 mating_pool = (pop_smis, pop_scores)
 
-                smis, pop_smis, pop_scores = ga_handler.query(
-                        # query_size=50, mating_pool=mating_pool, pool=pool, return_pop=True
-                        query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, rank_coefficient=config['rank_coefficient']
-                    )
+                for g in range(config['ga_generations']):
 
-                smis = list(set(smis))
-                score = np.array(self.oracle(smis))
-                new_experience = zip(smis, score)
-                experience.add_experience(new_experience)
+                    smis, pop_smis, pop_scores = ga_handler.query(
+                            # query_size=50, mating_pool=mating_pool, pool=pool, return_pop=True
+                            query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, rank_coefficient=config['rank_coefficient']
+                        )
 
-                print('GA:', score.max(), score.mean(), len(smis))
+                    smis = list(set(smis))
+                    score = np.array(self.oracle(smis))
+                    new_experience = zip(smis, score)
+                    experience.add_experience(new_experience)
 
-                if self.finish:
-                    print('max oracle hit')
-                    break
+                    mating_pool = (pop_smis+smis, pop_scores+score.tolist())
+
+                    print('GA' + str(g+1) + ':', score.max(), score.mean(), len(smis))
+
+                    if self.finish:
+                        print('max oracle hit')
+                        break
 
             
             # Experience Replay

@@ -94,14 +94,11 @@ class GeneticOperatorHandler:
 
         gc.collect()
 
-        if return_pop:
-            pop_valid_smis, pop_valid_scores = [], []
-            for m, s in zip(new_mating_pool, new_mating_scores):
-                try:
-                    pop_valid_smis.append(Chem.MolToSmiles(m, canonical=True))
-                    pop_valid_scores.append(s)
-                except:
-                    pass
-            return smis, pop_valid_smis, pop_valid_scores
-
-        return smis, None, None
+        pop_valid_smis, pop_valid_scores = [], []
+        for m, s in zip(new_mating_pool, new_mating_scores):
+            try:
+                pop_valid_smis.append(Chem.MolToSmiles(m, canonical=True))
+                pop_valid_scores.append(s)
+            except:
+                pass
+        return smis, pop_valid_smis, pop_valid_scores
