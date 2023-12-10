@@ -140,7 +140,7 @@ class GeneticGFN_Optimizer(BaseOptimizer):
 
                 if config['ga_blended']:
                     smis, population_mol, population_scores = expert_handler.blended_query(
-                        query_size=config['ga_offspring_size'], mating_pool=mating_pool, pool=pool, rank_based=True, return_pop=True
+                        query_size=config['ga_offspring_size'], mating_pool=mating_pool, pool=pool, rank_based=config['rank_based'], return_pop=True
                     )
                 else:
                     smis, population_mol, population_scores = expert_handler.query(

@@ -32,7 +32,7 @@ def make_mating_pool(population_mol: List[Mol], population_scores, offspring_siz
     if rank_based:
         scores_np = np.array(population_scores)
         ranks = np.argsort(np.argsort(-1 * scores_np))
-        weights = 1.0 / (1e-3 * len(scores_np) + ranks)
+        weights = 1.0 / (1e-2 * len(scores_np) + ranks)
         indices = list(torch.utils.data.WeightedRandomSampler(
             weights=weights, num_samples=offspring_size, replacement=replace
             ))
@@ -68,7 +68,7 @@ def make_blended_mating_pool(population_mol: List[Mol], population_scores, offsp
     if rank_based:
         scores_np = np.array(population_scores)
         ranks = np.argsort(np.argsort(-1 * scores_np))
-        weights = 1.0 / (1e-3 * len(scores_np) + ranks)
+        weights = 1.0 / (1e-2 * len(scores_np) + ranks)
         indices = list(torch.utils.data.WeightedRandomSampler(
             weights=weights, num_samples=offspring_size, replacement=replace
             ))
