@@ -92,7 +92,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
             smiles = seq_to_smiles(seqs, voc)
             score = np.array(self.oracle(smiles))
 
-            print('NN:', score.max(), score.mean(), len(score))
+            # print('NN:', score.max(), score.mean(), len(score))
 
             if self.finish:
                 print('max oracle hit')
@@ -144,16 +144,19 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
 
                     smis = list(set(smis))
                     score = np.array(self.oracle(smis))
-                    new_experience = zip(smis, score)
-                    experience.add_experience(new_experience)
 
                     mating_pool = (pop_smis+smis, pop_scores+score.tolist())
 
-                    print('GA' + str(g+1) + ':', score.max(), score.mean(), len(smis))
+                    # print('GA' + str(g+1) + ':', score.max(), score.mean(), len(smis))
 
                     if self.finish:
                         print('max oracle hit')
                         break
+                
+                if config['ga_generations'] > 1:
+                    smis, score = ga_handler.get_final_population(mating_pool)
+                new_experience = zip(smis, score)
+                experience.add_experience(new_experience)
 
             
             # Experience Replay
@@ -168,6 +171,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                     # encoded = [Variable(voc.encode(tokenized_i)) for tokenized_i in tokenized]
                     # encoded = MolData.collate_fn(encoded)
                     exp_agent_likelihood, exp_entropy = Agent.likelihood(exp_seqs.long())
+                    prior_agent_likelihood, _ = Prior.likelihood(exp_seqs.long())
                     # exp_augmented_likelihood = exp_prior_likelihood + config['sigma'] * exp_score
                     # exp_loss = torch.pow((Variable(exp_augmented_likelihood) - exp_agent_likelihood), 2)
                     # loss = torch.cat((loss, exp_loss), 0)
@@ -178,8 +182,10 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                     loss = torch.pow(exp_forward_flow - exp_backward_flow, 2).mean()
 
                     # Add regularizer that penalizes high likelihood for the entire sequence
-                    # loss_p = - (1 / exp_agent_likelihood).mean()
-                    # loss += 5 * 1e3 * loss_p
+                    if config['penalty']:
+                        loss_p = - (1 / exp_agent_likelihood).mean()
+                        # print('penalty:', loss_p.item())
+                        loss += 5 * 1e3 * loss_p
 
                     # print(loss.item())
                     avg_loss += loss.item()/config['experience_loop']
@@ -187,7 +193,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
-            print(avg_loss)
+            # print(avg_loss)
 
             # Calculate loss
             # loss = loss.mean()
