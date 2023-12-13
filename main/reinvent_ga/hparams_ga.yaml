@@ -6,7 +6,7 @@ experience_replay: 64
 lr_z: 0.1
 beta: 50
 mutation_rate: 0.01
-population_size: 64
+population_size: 128
 offspring_size: 24
 ga_generations: 3
 rank_coefficient: 0.01

@@ -11,6 +11,6 @@ do
 for oralce in "${oracle_array[@]}"
 do
 # echo $oralce
-CUDA_VISIBLE_DEVICES=0 python run.py reinvent_ga --task simple --config_default 'hparams_ga.yaml' --wandb online --run_name gen3_high_penalty --oracle $oralce --seed $seed
+CUDA_VISIBLE_DEVICES=0 python run.py reinvent_ga --task simple --config_default 'hparams_ga.yaml' --wandb online --run_name gen3_large_penaltyx5 --oracle $oralce --seed $seed
 done
 done

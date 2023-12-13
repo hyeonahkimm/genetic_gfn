@@ -171,7 +171,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                     # encoded = [Variable(voc.encode(tokenized_i)) for tokenized_i in tokenized]
                     # encoded = MolData.collate_fn(encoded)
                     exp_agent_likelihood, exp_entropy = Agent.likelihood(exp_seqs.long())
-                    prior_agent_likelihood, _ = Prior.likelihood(exp_seqs.long())
+                    # prior_agent_likelihood, _ = Prior.likelihood(exp_seqs.long())
                     # exp_augmented_likelihood = exp_prior_likelihood + config['sigma'] * exp_score
                     # exp_loss = torch.pow((Variable(exp_augmented_likelihood) - exp_agent_likelihood), 2)
                     # loss = torch.cat((loss, exp_loss), 0)
