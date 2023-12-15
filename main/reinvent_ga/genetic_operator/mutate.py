@@ -4,7 +4,7 @@ import numpy as np
 from rdkit import Chem, rdBase
 from rdkit.Chem import AllChem
 
-import model.genetic_operator.crossover as co
+import main.reinvent_ga.genetic_operator.crossover as co
 
 rdBase.DisableLog("rdApp.error")
 
@@ -117,6 +117,8 @@ def mutate(mol, mutation_rate):
     try:
         Chem.Kekulize(mol, clearAromaticFlags=True)
     except ValueError:
+        return mol
+    except:
         return mol
 
     p = [0.15, 0.14, 0.14, 0.14, 0.14, 0.14, 0.15]

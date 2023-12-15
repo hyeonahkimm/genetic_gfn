@@ -192,7 +192,7 @@ class GeneticGFN_Optimizer(BaseOptimizer):
             apprentice_handler.model.train()
             for _ in range(config['num_apprentice_training_steps']):
                 if config['use_tb_loss']:
-                    sampled_smis, sampled_score = expert_handler.get_final_population((apprentice_smis + expert_smis, apprentice_scores + expert_scores), rank_based=True, replace=True)
+                    sampled_smis, sampled_score = expert_handler.get_final_population((apprentice_smis + expert_smis, apprentice_scores + expert_scores), rank_based=False)
                     smis_scores = [(smiles, score) for smiles, score in zip(sampled_smis, sampled_score)]
                     # smis_scores = random.choices(population=total, k=config['apprentice_training_batch_size'])
                     loss = apprentice_handler.train_tb(smis_scores=smis_scores, device=device, beta=config['beta'])
@@ -209,6 +209,7 @@ class GeneticGFN_Optimizer(BaseOptimizer):
                     loss = apprentice_handler.train_on_batch(smis=smis, device=device)
 
                 avg_loss += loss / config['num_apprentice_training_steps']
+                print(avg_loss)
 
             fit_size = len(total_smis)
 

@@ -131,15 +131,16 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
             # experience.squeeze_by_kth(k=config['num_keep'])
 
             if config['population_size'] and len(self.oracle) > config['population_size']:
+                self.oracle.sort_buffer()
                 pop_smis, pop_scores = tuple(map(list, zip(*[(smi, elem[0]) for (smi, elem) in self.oracle.mol_buffer.items()])))
                 # print(list(self.oracle.mol_buffer))
-                mating_pool = (pop_smis, pop_scores)
+                mating_pool = (pop_smis[:config['num_keep']], pop_scores[:config['num_keep']])
 
                 for g in range(config['ga_generations']):
 
                     smis, pop_smis, pop_scores = ga_handler.query(
                             # query_size=50, mating_pool=mating_pool, pool=pool, return_pop=True
-                            query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, rank_coefficient=config['rank_coefficient']
+                            query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, rank_coefficient=config['rank_coefficient'], blended=config['blended_ga']
                         )
 
                     smis = list(set(smis))
@@ -170,7 +171,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                     # tokenized = [voc.tokenize(smile) for smile in smiles]
                     # encoded = [Variable(voc.encode(tokenized_i)) for tokenized_i in tokenized]
                     # encoded = MolData.collate_fn(encoded)
-                    exp_agent_likelihood, exp_entropy = Agent.likelihood(exp_seqs.long())
+                    exp_agent_likelihood, _ = Agent.likelihood(exp_seqs.long())
                     # prior_agent_likelihood, _ = Prior.likelihood(exp_seqs.long())
                     # exp_augmented_likelihood = exp_prior_likelihood + config['sigma'] * exp_score
                     # exp_loss = torch.pow((Variable(exp_augmented_likelihood) - exp_agent_likelihood), 2)
@@ -185,7 +186,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                     if config['penalty']:
                         loss_p = - (1 / exp_agent_likelihood).mean()
                         # print('penalty:', loss_p.item())
-                        loss += 5 * 1e3 * loss_p
+                        loss += 1e3 * loss_p
 
                     # print(loss.item())
                     avg_loss += loss.item()/config['experience_loop']

@@ -11,14 +11,15 @@ from rdkit import Chem, rdBase
 from rdkit.Chem.rdchem import Mol
 rdBase.DisableLog('rdApp.error')
 
-import main.graph_ga.crossover as co, main.graph_ga.mutate as mu
+import main.reinvent_ga.genetic_operator.crossover as co
+import main.reinvent_ga.genetic_operator.mutate as mu
 
 import gc
 
 
 MINIMUM = 1e-10
 
-def make_mating_pool(population_mol: List[Mol], population_scores, population_size: int, rank_coefficient=0.01):
+def make_mating_pool(population_mol: List[Mol], population_scores, population_size: int, rank_coefficient=0.01, blended=False, frac_graph_ga_mutate=0.1):
     """
     Given a population of RDKit Mol and their scores, sample a list of the same size
     with replacement using the population_scores as weights
@@ -48,7 +49,20 @@ def make_mating_pool(population_mol: List[Mol], population_scores, population_si
         mating_pool = [population_mol[i] for i in indices if population_mol[i] is not None]
         mating_pool_score = [population_scores[i] for i in indices if population_mol[i] is not None]
 
-    return mating_pool, mating_pool_score
+    if blended:
+        mutate_mating_pool, crossover_mating_pool = [], []
+        mutate_mating_score, crossover_mating_score = [], []
+        for i in range(len(mating_pool)):
+            if population_mol[i] is not None:
+                if np.random.rand(1) < frac_graph_ga_mutate and len(mutate_mating_pool) < int(population_size * frac_graph_ga_mutate) + 1:
+                    mutate_mating_pool.append(population_mol[i])
+                    mutate_mating_score.append(population_scores[i])
+                else:
+                    crossover_mating_pool.append(population_mol[i])
+                    crossover_mating_score.append(population_scores[i])
+        return crossover_mating_pool, crossover_mating_score, mutate_mating_pool, mutate_mating_score
+
+    return mating_pool, mating_pool_score, None, None
 
 
 def reproduce(mating_pool, mutation_rate):
@@ -73,17 +87,26 @@ class GeneticOperatorHandler:
         self.population_size = population_size
 
     def get_final_population(self, mating_pool, rank_coefficient=0.):
-        new_mating_pool, new_mating_scores = make_mating_pool(mating_pool[0], mating_pool[1], self.population_size, rank_coefficient)
+        new_mating_pool, new_mating_scores, _, _ = make_mating_pool(mating_pool[0], mating_pool[1], self.population_size, rank_coefficient)
         return (new_mating_pool, new_mating_scores)
 
-    def query(self, query_size, mating_pool, pool, rank_coefficient=0.01, return_pop=False):
+    def query(self, query_size, mating_pool, pool, rank_coefficient=0.01, blended=False):
         # print(mating_pool)
         population_mol = [Chem.MolFromSmiles(s) for s in mating_pool[0]]
         population_scores = mating_pool[1]
 
-        new_mating_pool, new_mating_scores = make_mating_pool(population_mol, population_scores, self.population_size, rank_coefficient)
+        cross_mating_pool, cross_mating_scores, mut_mating_pool, mut_mating_score = make_mating_pool(population_mol, population_scores, self.population_size, rank_coefficient, blended)
 
-        offspring_mol = pool(delayed(reproduce)(new_mating_pool, self.mutation_rate) for _ in range(query_size))
+        if blended:
+            mut_offspring_mol = mu.mutate(mut_mating_pool, mutation_rate=0.01)
+            cross_offspring_mol = pool(delayed(reproduce)(cross_mating_pool, self.mutation_rate) for _ in range(query_size))
+            offspring_mol = cross_offspring_mol + mut_offspring_mol
+            new_mating_pool = cross_mating_pool + mut_mating_pool
+            new_mating_scores = cross_mating_scores + mut_mating_score
+        else:
+            offspring_mol = pool(delayed(reproduce)(cross_mating_pool, self.mutation_rate) for _ in range(query_size))
+            new_mating_pool = cross_mating_pool
+            new_mating_scores = cross_mating_scores
 
         smis = []
         for m in offspring_mol:
