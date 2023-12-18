@@ -11,6 +11,6 @@ do
 for oralce in "${oracle_array[@]}"
 do
 # echo $oralce
-CUDA_VISIBLE_DEVICES=0 python run.py reinvent_ga --task simple --config_default 'hparams_quantile.yaml' --wandb online --run_name quantile_no_blended --oracle $oralce --seed $seed
+CUDA_VISIBLE_DEVICES=6 python run.py reinvent_ga --task simple --config_default 'hparams_quantile.yaml' --wandb online --run_name quantile_rank3_gen3 --oracle $oralce --seed $seed
 done
 done

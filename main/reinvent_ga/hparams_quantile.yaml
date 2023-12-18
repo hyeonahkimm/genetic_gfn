@@ -1,7 +1,7 @@
 learning_rate: 0.0005
 batch_size: 64
 num_keep: 1024
-experience_loop: 16
+experience_loop: 8
 experience_replay: 64
 lr_z: 0.1
 beta: 50

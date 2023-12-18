@@ -186,6 +186,33 @@ class Experience(object):
 
         encoded = MolData.collate_fn(encoded)
         return encoded, np.array(valid_scores)  #, np.array(prior_likelihood)
+    
+    def quantile_uniform_sample(self, n):
+        """Sample a batch size n of experience"""
+        if len(self.memory)<n:
+            raise IndexError('Size of memory ({}) is less than requested sample ({})'.format(len(self), n))
+        else:
+            scores_np = np.array([x[1] for x in self.memory])
+            quantiles = 1 - np.logspace(-3, 0, 25)
+            n_samples_per_quanitile = int(np.ceil(n / len(quantiles)))
+
+            encoded, valid_scores = [], []
+            for q in quantiles:
+                score_threshold = np.quantile(scores_np, q)
+                eligible_population = [x for x in self.memory if x[1] >= score_threshold]
+                # samples.extend(np.random.choices(population=eligible_population, k=n_samples_per_quanitile))
+                indices = np.random.choice(np.arange(len(eligible_population)), size=n_samples_per_quanitile, replace=True)
+                
+                for i in indices:
+                    try:
+                        tokenized = self.voc.tokenize(eligible_population[i][0])
+                        encoded.append(Variable(self.voc.encode(tokenized)))
+                        valid_scores.append(eligible_population[i][1])
+                    except:
+                        pass
+
+        encoded = MolData.collate_fn(encoded)
+        return encoded, np.array(valid_scores)  #, np.array(prior_likelihood)
 
     def initiate_from_file(self, fname, scoring_function, Prior):
         """Adds experience from a file with SMILES
