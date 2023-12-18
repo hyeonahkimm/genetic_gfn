@@ -187,7 +187,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                     exp_backward_flow = torch.tensor(exp_score).cuda() * config['beta']
                     loss = torch.pow(exp_forward_flow - exp_backward_flow, 2).mean()
 
-                    # Add regularizer that penalizes high likelihood for the entire sequence
+                    # Add regularizer that penalizes high likelihood for the entire sequence (from REINVENT)
                     if config['penalty']:
                         loss_p = - (1 / exp_agent_likelihood).mean()
                         # print('penalty:', loss_p.item())
