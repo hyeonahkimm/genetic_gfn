@@ -30,7 +30,20 @@ def make_mating_pool(population_mol: List[Mol], population_scores, population_si
     Returns: a list of RDKit Mol (probably not unique)
     """
     # scores -> probs 
-    if rank_coefficient > 0:
+    if rank_coefficient >= 1:
+        scores_np = np.array(population_scores)
+        quantiles = 1 - np.logspace(-3, 0, 25)
+        n_samples_per_quanitile = int(np.ceil(population_size / len(quantiles)))
+
+        mating_pool, mating_pool_score = [], []
+        for q in quantiles:
+            score_threshold = np.quantile(population_scores, q)
+            eligible_population = [(smiles, score) for score, smiles in zip(population_scores, population_mol) if score >= score_threshold]
+            # samples.extend(np.random.choices(population=eligible_population, k=n_samples_per_quanitile))
+            indices = np.random.choice(np.arange(len(eligible_population)), size=n_samples_per_quanitile)
+            mating_pool.extend([eligible_population[i][0]for i in indices if eligible_population[i][0] is not None])
+            mating_pool_score.extend([eligible_population[i][1] for i in indices if eligible_population[i][0] is not None])
+    elif rank_coefficient > 0:
         scores_np = np.array(population_scores)
         ranks = np.argsort(np.argsort(-1 * scores_np))
         weights = 1.0 / (rank_coefficient * len(scores_np) + ranks)

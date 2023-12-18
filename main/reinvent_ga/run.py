@@ -165,8 +165,10 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
             avg_loss = 0.
             if config['experience_replay'] and len(experience) > config['experience_replay']:
                 for _ in range(config['experience_loop']):
-                    # exp_seqs, exp_score = experience.sample(config['experience_replay'])
-                    exp_seqs, exp_score = experience.rank_based_sample(config['experience_replay'])
+                    if 1 > config['rank_coefficient'] > 0:
+                        exp_seqs, exp_score = experience.rank_based_sample(config['experience_replay'])
+                    else:
+                        exp_seqs, exp_score = experience.sample(config['experience_replay'])
                     # exp_seqs, exp_smis, exp_score = experience.sample_batch(config['experience_replay']) 
                     # tokenized = [voc.tokenize(smile) for smile in smiles]
                     # encoded = [Variable(voc.encode(tokenized_i)) for tokenized_i in tokenized]
