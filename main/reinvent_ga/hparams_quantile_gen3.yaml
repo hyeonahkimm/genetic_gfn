@@ -8,7 +8,7 @@ beta: 50
 mutation_rate: 0.01
 population_size: 64
 offspring_size: 24
-ga_generations: 2
+ga_generations: 3
 rank_coefficient: 1
 num_jobs: 1
 penalty: REINVENT

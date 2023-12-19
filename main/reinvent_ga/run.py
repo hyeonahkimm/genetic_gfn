@@ -212,7 +212,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                     # encoded = [Variable(voc.encode(tokenized_i)) for tokenized_i in tokenized]
                     # encoded = MolData.collate_fn(encoded)
                     exp_agent_likelihood, _ = Agent.likelihood(exp_seqs.long())
-                    # prior_agent_likelihood, _ = Prior.likelihood(exp_seqs.long())
+                    prior_agent_likelihood, _ = Prior.likelihood(exp_seqs.long())
                     # exp_augmented_likelihood = exp_prior_likelihood + config['sigma'] * exp_score
                     # exp_loss = torch.pow((Variable(exp_augmented_likelihood) - exp_agent_likelihood), 2)
                     # loss = torch.cat((loss, exp_loss), 0)
@@ -223,10 +223,14 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                     loss = torch.pow(exp_forward_flow - exp_backward_flow, 2).mean()
 
                     # Add regularizer that penalizes high likelihood for the entire sequence (from REINVENT)
-                    if config['penalty']:
+                    if config['penalty'] == 'REINVENT':
+                        # print(torch.nn.functional.mse_loss(exp_agent_likelihood, prior_agent_likelihood))
                         loss_p = - (1 / exp_agent_likelihood).mean()
                         # print('penalty:', loss_p.item())
                         loss += 1e3 * loss_p
+                    elif config['penalty'] == 'prior_l2':
+                        loss_p = torch.nn.functional.mse_loss(exp_agent_likelihood, prior_agent_likelihood)
+                        loss += 1e-2 * loss_p
 
                     # print(loss.item())
                     avg_loss += loss.item()/config['experience_loop']

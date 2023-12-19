@@ -11,5 +11,5 @@ offspring_size: 24
 ga_generations: 0
 rank_coefficient: 0.01
 num_jobs: 1
-penalty: True
+penalty: prior_l2
 blended_ga: False
