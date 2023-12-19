@@ -145,7 +145,7 @@ class Experience(object):
         # for m in self.memory:
         #     smiles.append(m[0])
         #     scores.append(m[1])
-        return tuple(map(list, zip(*[(smi, elem[0]) for (smi, elem) in self.memory])))
+        return tuple(map(list, zip(*[(smi, score) for (smi, score) in self.memory])))
     
     def sample(self, n):
         """Sample a batch size n of experience"""

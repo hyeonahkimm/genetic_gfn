@@ -58,6 +58,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
         # occur more often (which means the agent can get biased towards them). Using experience replay is
         # therefor not as theoretically sound as it is for value based RL, but it seems to work well.
         experience = Experience(voc, max_size=config['num_keep'])
+        # ga_experience = Experience(voc, max_size=config['num_keep'])
         # experience = MaxRewardPriorityQueue()
 
         # Prepare genetic expert
@@ -69,6 +70,9 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
 
         step = 0
         patience = 0
+        prev_max = 0.
+        delta_score = 0.
+        stuck_cnt = 0
 
         while True:
 
@@ -80,6 +84,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
             
             # Sample from Agent
             seqs, agent_likelihood, entropy = Agent.sample(config['batch_size'])
+            # seqs, agent_likelihood, entropy = Agent.sample(config['batch_size'], temp = 1. + float(config['dynamic_temp']) * min(stuck_cnt, 10) * 0.1)
 
             # Remove duplicates, ie only consider unique seqs
             unique_idxs = unique(seqs)
@@ -92,6 +97,12 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
             smiles = seq_to_smiles(seqs, voc)
             score = np.array(self.oracle(smiles))
 
+            delta_score = np.clip(score.max() - prev_max, a_min = 0, a_max = 0.5)
+            if prev_max < score.max():
+                prev_max = score.max()
+                stuck_cnt = 0
+            else:
+                stuck_cnt += 1
             # print('NN:', score.max(), score.mean(), len(score))
 
             if self.finish:
@@ -131,33 +142,57 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
             # experience.squeeze_by_kth(k=config['num_keep'])
 
             if config['population_size'] and len(self.oracle) > config['population_size']:
-                self.oracle.sort_buffer()
-                pop_smis, pop_scores = tuple(map(list, zip(*[(smi, elem[0]) for (smi, elem) in self.oracle.mol_buffer.items()])))
+                if config['ga_sample_from'] == 'experience':
+                    pop_smis, pop_scores = experience.get_elems()
+                elif config['ga_sample_from'] == 'sample':
+                    pop_smis, pop_scores = smiles, score
+                else:
+                    self.oracle.sort_buffer()
+                    pop_smis, pop_scores = tuple(map(list, zip(*[(smi, elem[0]) for (smi, elem) in self.oracle.mol_buffer.items()])))
                 # print(list(self.oracle.mol_buffer))
                 mating_pool = (pop_smis[:config['num_keep']], pop_scores[:config['num_keep']])
 
                 for g in range(config['ga_generations']):
-
-                    smis, pop_smis, pop_scores = ga_handler.query(
+                    child_smis, pop_smis, pop_scores = ga_handler.query(
                             # query_size=50, mating_pool=mating_pool, pool=pool, return_pop=True
-                            query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, rank_coefficient=config['rank_coefficient'], blended=config['blended_ga']
+                            query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, 
+                            rank_coefficient=config['rank_coefficient'], 
+                            blended=config['blended_ga'],
+                            # mutation_rate = config['mutation_rate'] + float(config['dynamic_temp']) * delta_score
                         )
 
-                    smis = list(set(smis))
-                    score = np.array(self.oracle(smis))
+                    child_smis = list(set(child_smis))
+                    child_score = np.array(self.oracle(child_smis))
+                    
+                    # high_smis, high_score = [], []
+                    # for idx, s in enumerate(score):
+                    #     if s > prev_max:
+                    #         # new_experience = zip(smis[idx], s)
+                    #         high_smis.append(smis[idx])
+                    #         high_score.append(s)
+                    
+                    new_experience = zip(child_smis, child_score)
+                    experience.add_experience(new_experience)
 
-                    mating_pool = (pop_smis+smis, pop_scores+score.tolist())
+                    mating_pool = (pop_smis+child_smis, pop_scores+child_score.tolist())
 
-                    # print('GA' + str(g+1) + ':', score.max(), score.mean(), len(smis))
+                    # delta_score = np.clip(score.max() - prev_max, a_min = 0, a_max = 0.5)
+                    # if prev_max < score.max():
+                    #     prev_max = score.max()
+                    #     stuck_cnt = 0
+                    # else:
+                    #     stuck_cnt += 1
+                    # print('GA' + str(g+1) + ':', child_score.max(), child_score.mean(), len(child_smis))
 
                     if self.finish:
                         print('max oracle hit')
                         break
                 
-                if config['ga_generations'] > 1:
-                    smis, score = ga_handler.get_final_population(mating_pool)
-                new_experience = zip(smis, score)
-                experience.add_experience(new_experience)
+                # if config['ga_generations'] > 1:
+                #     smis, score = ga_handler.get_final_population(mating_pool)
+                # new_experience = zip(mating_pool[0], mating_pool[1])
+                # new_experience = zip(child_smis, child_score)
+                # experience.add_experience(new_experience)
 
             
             # Experience Replay
@@ -198,6 +233,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
 
                     optimizer.zero_grad()
                     loss.backward()
+                    # grad_norms = torch.nn.utils.clip_grad_norm_(Agent.rnn.parameters(), 1.0)
                     optimizer.step()
             # print(avg_loss)
 

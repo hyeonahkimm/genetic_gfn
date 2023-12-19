@@ -102,27 +102,32 @@ class GeneticOperatorHandler:
         new_mating_pool, new_mating_scores, _, _ = make_mating_pool(mating_pool[0], mating_pool[1], self.population_size, rank_coefficient)
         return (new_mating_pool, new_mating_scores)
 
-    def query(self, query_size, mating_pool, pool, rank_coefficient=0.01, blended=False):
+    def query(self, query_size, mating_pool, pool, rank_coefficient=0.01, blended=False, mutation_rate=None):
         # print(mating_pool)
+        if mutation_rate is None:
+            mutation_rate = self.mutation_rate
         population_mol = [Chem.MolFromSmiles(s) for s in mating_pool[0]]
         population_scores = mating_pool[1]
 
         cross_mating_pool, cross_mating_scores, mut_mating_pool, mut_mating_score = make_mating_pool(population_mol, population_scores, self.population_size, rank_coefficient, blended)
 
         if blended:
+            mut_size = int(query_size * 0.1)
+            cross_size = query_size - mut_size
             mut_offspring_mol = mu.mutate(mut_mating_pool, mutation_rate=0.01)
-            cross_offspring_mol = pool(delayed(reproduce)(cross_mating_pool, self.mutation_rate) for _ in range(query_size))
+            cross_offspring_mol = pool(delayed(reproduce)(cross_mating_pool, mutation_rate) for _ in range(cross_size))
             offspring_mol = cross_offspring_mol + mut_offspring_mol
             new_mating_pool = cross_mating_pool + mut_mating_pool
             new_mating_scores = cross_mating_scores + mut_mating_score
         else:
-            offspring_mol = pool(delayed(reproduce)(cross_mating_pool, self.mutation_rate) for _ in range(query_size))
+            offspring_mol = pool(delayed(reproduce)(cross_mating_pool, mutation_rate) for _ in range(query_size))
             new_mating_pool = cross_mating_pool
             new_mating_scores = cross_mating_scores
 
         smis = []
         for m in offspring_mol:
             try:
+                # smis.append(Chem.MolToSmiles(m))
                 smis.append(Chem.MolToSmiles(m, canonical=True))
             except:
                 pass
@@ -132,6 +137,7 @@ class GeneticOperatorHandler:
         pop_valid_smis, pop_valid_scores = [], []
         for m, s in zip(new_mating_pool, new_mating_scores):
             try:
+                # pop_valid_smis.append(Chem.MolToSmiles(m))
                 pop_valid_smis.append(Chem.MolToSmiles(m, canonical=True))
                 pop_valid_scores.append(s)
             except:

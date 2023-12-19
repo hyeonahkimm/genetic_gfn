@@ -6,10 +6,11 @@ experience_replay: 64
 lr_z: 0.1
 beta: 50
 mutation_rate: 0.01
-population_size: 0
+population_size: 64
 offspring_size: 24
-ga_generations: 0
-rank_coefficient: 0.01
+ga_generations: 1
+rank_coefficient: 0.001
 num_jobs: 1
 penalty: True
 blended_ga: False
+ga_sample_from: oracle
