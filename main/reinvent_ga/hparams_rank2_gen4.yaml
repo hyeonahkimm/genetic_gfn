@@ -8,9 +8,11 @@ beta: 50
 mutation_rate: 0.01
 population_size: 64
 offspring_size: 24
-ga_generations: 3
+ga_generations: 4
 rank_coefficient: 0.01
 num_jobs: 1
 penalty: prior_l2
 blended_ga: False
 ga_sample_from: mol_buffer
+ga_operator: graph
+low_score_ratio: 0.

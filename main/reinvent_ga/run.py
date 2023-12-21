@@ -13,6 +13,7 @@ import torch
 
 from joblib import Parallel
 from graph_ga_expert import GeneticOperatorHandler
+# from smiles_ga_expert import GeneticOperatorHandler as SmilesGA
 
 
 class REINVENT_GA_Optimizer(BaseOptimizer):
@@ -62,6 +63,11 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
         # experience = MaxRewardPriorityQueue()
 
         # Prepare genetic expert
+        # if config['ga_operator'] == 'graph':
+        #     GeneticOperatorHandler = GraphGA
+        # elif config['ga_operator'] == 'smiles':
+        #     GeneticOperatorHandler = SmilesGA
+
         ga_handler = GeneticOperatorHandler(mutation_rate=config['mutation_rate'], 
                                             population_size=config['population_size'])
         pool = Parallel(n_jobs=config['num_jobs'])
@@ -103,7 +109,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                 stuck_cnt = 0
             else:
                 stuck_cnt += 1
-            # print('NN:', score.max(), score.mean(), len(score))
+            # print('NN:', score.max(), score.mean(), score.std(), len(score))
 
             if self.finish:
                 print('max oracle hit')
@@ -159,6 +165,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                             rank_coefficient=config['rank_coefficient'], 
                             blended=config['blended_ga'],
                             # mutation_rate = config['mutation_rate'] + float(config['dynamic_temp']) * delta_score
+                            low_score_ratio = config['low_score_ratio']
                         )
 
                     child_smis = list(set(child_smis))
@@ -182,7 +189,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                     #     stuck_cnt = 0
                     # else:
                     #     stuck_cnt += 1
-                    # print('GA' + str(g+1) + ':', child_score.max(), child_score.mean(), len(child_smis))
+                    # print('GA' + str(g+1) + ':', child_score.max(), child_score.mean(), child_score.std(), len(child_smis))
 
                     if self.finish:
                         print('max oracle hit')
