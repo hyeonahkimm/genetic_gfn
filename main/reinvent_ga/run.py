@@ -77,7 +77,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
         step = 0
         patience = 0
         prev_max = 0.
-        delta_score = 0.
+        prev_n_oracles = 0
         stuck_cnt = 0
 
         while True:
@@ -103,12 +103,13 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
             smiles = seq_to_smiles(seqs, voc)
             score = np.array(self.oracle(smiles))
 
-            delta_score = np.clip(score.max() - prev_max, a_min = 0, a_max = 0.5)
-            if prev_max < score.max():
-                prev_max = score.max()
-                stuck_cnt = 0
-            else:
-                stuck_cnt += 1
+            # delta_score = np.clip(score.max() - prev_max, a_min = 0, a_max = 0.5)
+            # if prev_max < score.max():
+            #     prev_max = score.max()
+            #     stuck_cnt = 0
+            #     print('NN:', score.max(), score.mean(), score.std(), len(score))
+            # else:
+            #     stuck_cnt += 1
             # print('NN:', score.max(), score.mean(), score.std(), len(score))
 
             if self.finish:
@@ -127,6 +128,17 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                         break
                 else:
                     patience = 0
+
+            # early stopping
+            if prev_n_oracles < len(self.oracle):
+                stuck_cnt = 0
+            else:
+                prev_n_oracles = len(self.oracle)
+                stuck_cnt += 1
+                if stuck_cnt >= 10:
+                    self.log_intermediate(finish=True)
+                    print('cannot find new molecules, abort ...... ')
+                    break
 
             # Calculate augmented likelihood
             # augmented_likelihood = prior_likelihood.float() + 500 * Variable(score).float()
@@ -225,8 +237,12 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                     # loss = torch.cat((loss, exp_loss), 0)
                     # agent_likelihood = torch.cat((agent_likelihood, exp_agent_likelihood), 0)
 
+                    reward = torch.tensor(exp_score).cuda()
+                    if config['penalty'] == 'kl':
+                        reward -= 0.01 * (exp_agent_likelihood - prior_agent_likelihood)
+
                     exp_forward_flow = exp_agent_likelihood + log_z
-                    exp_backward_flow = torch.tensor(exp_score).cuda() * config['beta']
+                    exp_backward_flow = reward * config['beta']
                     loss = torch.pow(exp_forward_flow - exp_backward_flow, 2).mean()
 
                     # Add regularizer that penalizes high likelihood for the entire sequence (from REINVENT)
@@ -238,6 +254,15 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                     elif config['penalty'] == 'prior_l2':
                         loss_p = torch.nn.functional.mse_loss(exp_agent_likelihood, prior_agent_likelihood)
                         loss += 1e-2 * loss_p
+                    elif config['penalty'] == 'prior_kl':
+                        loss_p = (exp_agent_likelihood.exp() * (exp_agent_likelihood - prior_agent_likelihood)).sum()
+                        # print(loss.item())
+                        # print(loss_p.item(), 1e-2 * torch.nn.functional.mse_loss(exp_agent_likelihood, prior_agent_likelihood).item(), 1e3 * (1 / exp_agent_likelihood).mean().item())
+                        loss += 1e2 * loss_p
+                    elif config['penalty'] == 'full_kl':
+                        loss_p = torch.nn.functional.kl_div(exp_agent_likelihood, prior_agent_likelihood, log_target=True, reduction="none").sum(-1)
+                        # print(loss_p.mean().item())
+                        loss += loss_p.mean()
 
                     # print(loss.item())
                     avg_loss += loss.item()/config['experience_loop']
