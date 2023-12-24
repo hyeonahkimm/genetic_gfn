@@ -239,7 +239,8 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
 
                     reward = torch.tensor(exp_score).cuda()
                     if config['penalty'] == 'kl':
-                        reward -= 0.01 * (exp_agent_likelihood - prior_agent_likelihood)
+                        # print((exp_agent_likelihood - prior_agent_likelihood).mean())
+                        reward -= 0.001 * (exp_agent_likelihood - prior_agent_likelihood)
 
                     exp_forward_flow = exp_agent_likelihood + log_z
                     exp_backward_flow = reward * config['beta']
