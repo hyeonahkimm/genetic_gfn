@@ -15,3 +15,5 @@ penalty: kl
 blended_ga: False
 ga_sample_from: mol_buffer
 low_score_ratio: 0.
+canonical: True
+canonicalize: True
