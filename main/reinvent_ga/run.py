@@ -16,6 +16,16 @@ from graph_ga_expert import GeneticOperatorHandler
 # from smiles_ga_expert import GeneticOperatorHandler as SmilesGA
 
 
+def canonicalize_smiles(smiles):
+    canonicalized = []
+    for s in smiles:
+        try:
+            canonicalized.append(Chem.MolToSmiles(Chem.MolFromSmiles(s), canonical=True))
+        except:
+            canonicalized.append(s)
+    return canonicalized
+
+
 class REINVENT_GA_Optimizer(BaseOptimizer):
 
     def __init__(self, args=None):
@@ -62,12 +72,6 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
         # ga_experience = Experience(voc, max_size=config['num_keep'])
         # experience = MaxRewardPriorityQueue()
 
-        # Prepare genetic expert
-        # if config['ga_operator'] == 'graph':
-        #     GeneticOperatorHandler = GraphGA
-        # elif config['ga_operator'] == 'smiles':
-        #     GeneticOperatorHandler = SmilesGA
-
         ga_handler = GeneticOperatorHandler(mutation_rate=config['mutation_rate'], 
                                             population_size=config['population_size'])
         pool = Parallel(n_jobs=config['num_jobs'])
@@ -101,6 +105,8 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
             # Get prior likelihood and score
             prior_likelihood, _ = Prior.likelihood(Variable(seqs))
             smiles = seq_to_smiles(seqs, voc)
+            if config['canonicalize']:
+                smiles = canonicalize_smiles(smiles)
             score = np.array(self.oracle(smiles))
 
             # delta_score = np.clip(score.max() - prev_max, a_min = 0, a_max = 0.5)
@@ -133,12 +139,13 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
             if prev_n_oracles < len(self.oracle):
                 stuck_cnt = 0
             else:
-                prev_n_oracles = len(self.oracle)
                 stuck_cnt += 1
                 if stuck_cnt >= 10:
                     self.log_intermediate(finish=True)
                     print('cannot find new molecules, abort ...... ')
                     break
+            
+            prev_n_oracles = len(self.oracle)
 
             # Calculate augmented likelihood
             # augmented_likelihood = prior_likelihood.float() + 500 * Variable(score).float()
@@ -153,7 +160,18 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
             # Then add new experience
             # prior_likelihood = prior_likelihood.data.cpu().numpy()
             # new_experience = zip(smiles, score, prior_likelihood)
-            new_experience = zip(smiles, score)
+            
+            if not config['canonical']:
+                num_atoms = []
+                for s in smiles:
+                    try:
+                        mol = Chem.MolFromSmiles(s)
+                        num_atoms.append(mol.GetNumAtoms())
+                    except:
+                        num_atoms.append(1)
+                new_experience = zip(smiles, score, num_atoms)
+            else:
+                new_experience = zip(smiles, score)
             experience.add_experience(new_experience)
 
             # experience.add_list(seqs=seqs, smis=smiles, scores=score)
@@ -171,7 +189,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                 mating_pool = (pop_smis[:config['num_keep']], pop_scores[:config['num_keep']])
 
                 for g in range(config['ga_generations']):
-                    child_smis, pop_smis, pop_scores = ga_handler.query(
+                    child_smis, child_n_atoms, pop_smis, pop_scores = ga_handler.query(
                             # query_size=50, mating_pool=mating_pool, pool=pool, return_pop=True
                             query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, 
                             rank_coefficient=config['rank_coefficient'], 
@@ -180,7 +198,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                             low_score_ratio = config['low_score_ratio']
                         )
 
-                    child_smis = list(set(child_smis))
+                    # child_smis = list(set(child_smis))
                     child_score = np.array(self.oracle(child_smis))
                     
                     # high_smis, high_score = [], []
@@ -190,7 +208,10 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                     #         high_smis.append(smis[idx])
                     #         high_score.append(s)
                     
-                    new_experience = zip(child_smis, child_score)
+                    if not config['canonical']:
+                        new_experience = zip(child_smis, child_score, child_n_atoms)
+                    else:
+                        new_experience = zip(child_smis, child_score)
                     experience.add_experience(new_experience)
 
                     mating_pool = (pop_smis+child_smis, pop_scores+child_score.tolist())
@@ -221,9 +242,10 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                 for _ in range(config['experience_loop']):
                     if config['rank_coefficient'] >= 1:
                         # exp_seqs, exp_score = experience.quantile_uniform_sample(config['experience_replay'], 0.001)
-                        exp_seqs, exp_score = experience.rank_based_sample(config['experience_replay'], 0.001)
+                        exp_seqs, exp_score, _ = experience.rank_based_sample(config['experience_replay'], 0.001)
                     elif config['rank_coefficient'] > 0:
-                        exp_seqs, exp_score = experience.rank_based_sample(config['experience_replay'], config['rank_coefficient'])
+                        exp_seqs, exp_score, exp_pb = experience.rank_based_sample(config['experience_replay'], config['rank_coefficient'], return_pb=~config['canonical'])
+                        # exp_seqs, exp_score, exp_pb = experience.rank_based_sample(config['experience_replay'], config['rank_coefficient'], return_pb=~config['canonical'])
                     else:
                         exp_seqs, exp_score = experience.sample(config['experience_replay'])
                     # exp_seqs, exp_smis, exp_score = experience.sample_batch(config['experience_replay']) 
@@ -244,6 +266,9 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
 
                     exp_forward_flow = exp_agent_likelihood + log_z
                     exp_backward_flow = reward * config['beta']
+                    if not config['canonical']:
+                        # print(exp_pb)
+                        exp_backward_flow += torch.tensor(np.log(1/exp_pb)).cuda()  # approximated uniform pb
                     loss = torch.pow(exp_forward_flow - exp_backward_flow, 2).mean()
 
                     # Add regularizer that penalizes high likelihood for the entire sequence (from REINVENT)

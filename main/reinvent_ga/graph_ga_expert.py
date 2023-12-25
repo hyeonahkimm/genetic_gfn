@@ -132,11 +132,14 @@ class GeneticOperatorHandler:
             new_mating_pool = cross_mating_pool
             new_mating_scores = cross_mating_scores
 
-        smis = []
+        smis, n_atoms = [], []
         for m in offspring_mol:
             try:
                 # smis.append(Chem.MolToSmiles(m))
-                smis.append(Chem.MolToSmiles(m, canonical=True))
+                smi = Chem.MolToSmiles(m, canonical=True)
+                if smi not in smis:  # unique
+                    smis.append(smi)
+                    n_atoms.append(m.GetNumAtoms())
             except:
                 pass
 
@@ -150,4 +153,5 @@ class GeneticOperatorHandler:
                 pop_valid_scores.append(s)
             except:
                 pass
-        return smis, pop_valid_smis, pop_valid_scores
+        
+        return smis, n_atoms, pop_valid_smis, pop_valid_scores

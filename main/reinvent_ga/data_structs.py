@@ -124,7 +124,7 @@ class Experience(object):
         self.voc = voc
 
     def add_experience(self, experience):
-        """Experience should be a list of (smiles, score, prior likelihood) tuples"""
+        """Experience should be a list of (smiles, score, (n_atoms)) tuples"""
         self.memory.extend(experience)
         if len(self.memory)>self.max_size:
             # Remove duplicates
@@ -149,7 +149,7 @@ class Experience(object):
     
     def sample(self, n):
         """Sample a batch size n of experience"""
-        if len(self.memory)<n:
+        if len(self.memory) < n:
             raise IndexError('Size of memory ({}) is less than requested sample ({})'.format(len(self), n))
         else:
             scores = [x[1]+1e-10 for x in self.memory]
@@ -171,7 +171,7 @@ class Experience(object):
         encoded = MolData.collate_fn(encoded)
         return encoded, np.array(valid_scores)  #, np.array(prior_likelihood)
 
-    def rank_based_sample(self, n, rank_coefficient=0.01):
+    def rank_based_sample(self, n, rank_coefficient=0.01, return_pb=False):
         """Sample a batch size n of experience"""
         if len(self.memory)<n:
             raise IndexError('Size of memory ({}) is less than requested sample ({})'.format(len(self), n))
@@ -184,16 +184,19 @@ class Experience(object):
                 ))
 
             encoded, valid_scores = [], []
+            pbs = []
             for i in indices:
                 try:
                     tokenized = self.voc.tokenize(self.memory[i][0])
                     encoded.append(Variable(self.voc.encode(tokenized)))
                     valid_scores.append(self.memory[i][1])
+                    if return_pb:
+                        pbs.append(self.memory[i][2])
                 except:
                     pass
 
         encoded = MolData.collate_fn(encoded)
-        return encoded, np.array(valid_scores)  #, np.array(prior_likelihood)
+        return encoded, np.array(valid_scores), np.array(pbs)
     
     def quantile_uniform_sample(self, n):
         """Sample a batch size n of experience"""
