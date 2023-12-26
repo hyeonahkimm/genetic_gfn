@@ -16,7 +16,7 @@ from graph_ga_expert import GeneticOperatorHandler
 # from smiles_ga_expert import GeneticOperatorHandler as SmilesGA
 
 
-def canonicalize_smiles(smiles):
+def canonicalize(smiles):
     canonicalized = []
     for s in smiles:
         try:
@@ -106,7 +106,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
             prior_likelihood, _ = Prior.likelihood(Variable(seqs))
             smiles = seq_to_smiles(seqs, voc)
             if config['canonicalize']:
-                smiles = canonicalize_smiles(smiles)
+                smiles = canonicalize(smiles)
             score = np.array(self.oracle(smiles))
 
             # delta_score = np.clip(score.max() - prev_max, a_min = 0, a_max = 0.5)
