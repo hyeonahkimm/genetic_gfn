@@ -151,7 +151,7 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
             accept_mask = repaired_score > score
             # print(len(repaired_smiles), accept_mask.sum())
 
-            new_experience = zip([repaired_score[j] for j in accept_mask.nonzero()], repaired_score[accept_mask])
+            new_experience = zip([repaired_smiles[j] for j in accept_mask.nonzero()[0]], repaired_score[accept_mask])
             experience.add_experience(new_experience)
 
             # assert False
@@ -170,7 +170,7 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
                         # exp_seqs, exp_score = experience.quantile_uniform_sample(config['experience_replay'], 0.001)
                         exp_seqs, exp_score, _ = experience.rank_based_sample(config['experience_replay'], 0.001)
                     elif config['rank_coefficient'] > 0:
-                        exp_seqs, exp_score, exp_pb = experience.rank_based_sample(config['experience_replay'], config['rank_coefficient'], return_pb=~config['canonicalize'])
+                        exp_seqs, exp_score, _ = experience.rank_based_sample(config['experience_replay'], config['rank_coefficient'])
                         # exp_seqs, exp_score, exp_pb = experience.rank_based_sample(config['experience_replay'], config['rank_coefficient'], return_pb=~config['canonical'])
                     else:
                         exp_seqs, exp_score = experience.sample(config['experience_replay'])
