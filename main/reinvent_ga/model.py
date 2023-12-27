@@ -121,6 +121,55 @@ class RNN():
         sequences = torch.cat(sequences, 1)
         return sequences.data, log_probs, entropy
 
+    def sample_start_from(self, partial_seqs, max_length=140, temp=1.0):
+        """
+            Sample a batch of sequences
+
+            Args:
+                partial_seqs: Partial (destroyed) sequences - tensor
+                max_length:  Maximum length of the sequences
+
+            Outputs:
+            seqs: (batch_size, seq_length) The sampled sequences.
+            log_probs : (batch_size) Log likelihood for each sequence.
+            entropy: (batch_size) The entropies for the sequences. Not
+                                    currently used.
+        """
+        batch_size = partial_seqs.shape[0]
+        seq_length = partial_seqs.shape[1]
+        start_token = Variable(torch.zeros(batch_size).long())
+        start_token[:] = self.voc.vocab['GO']
+        h = self.rnn.init_h(batch_size)
+        x = start_token
+        
+        sequences = []
+        log_probs = Variable(torch.zeros(batch_size))
+        finished = torch.zeros(batch_size).byte()
+        entropy = Variable(torch.zeros(batch_size))
+        if torch.cuda.is_available():
+            finished = finished.cuda()
+
+        for step in range(max_length):
+            logits, h = self.rnn(x, h)
+            # print('logits shape', logits.shape) ##### [128, 109]
+            prob = F.softmax(logits, dim = 1)
+            log_prob = F.log_softmax(logits / temp, dim = 1)
+            if step < seq_length:
+                x = partial_seqs[:, step].view(-1)
+            else:
+                x = torch.multinomial(prob, num_samples=1).view(-1)
+            sequences.append(x.view(-1, 1))
+            log_probs +=  NLLLoss(log_prob, x)
+            entropy += -torch.sum((log_prob * prob), 1)
+
+            x = Variable(x.data)
+            EOS_sampled = (x == self.voc.vocab['EOS']).data
+            finished = torch.ge(finished + EOS_sampled, 1)
+            if torch.prod(finished) == 1: break
+
+        sequences = torch.cat(sequences, 1)
+        return sequences.data, log_probs, entropy
+
 def NLLLoss(inputs, targets):
     """
         Custom Negative Log Likelihood loss that returns loss per example,

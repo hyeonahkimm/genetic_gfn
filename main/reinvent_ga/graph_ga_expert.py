@@ -31,7 +31,7 @@ def make_mating_pool(population_mol: List[Mol], population_scores, population_si
     """
     # scores -> probs 
     if rank_coefficient >= 1:
-        quantiles = 1 - np.logspace(-3, 0, 25)
+        quantiles = 1 - np.logspace(-3, 0, 10)
         n_samples_per_quanitile = int(np.ceil(population_size / len(quantiles)))
 
         mating_pool, mating_pool_score = [], []

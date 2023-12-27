@@ -160,24 +160,6 @@ class Experience(object):
             self.memory = self.memory[:self.max_size]
             # print("\nBest score in memory: {:.2f}".format(self.memory[0][1]))
 
-    def topk_selfies(self, n):
-        """ [SymRD] Sample top-n of experience """
-        if len(self.memory)<n:
-            raise IndexError('Size of memory ({}) is less than requested sample ({})'.format(len(self), n))
-        else:
-            scores = [x[1]+1e-10 for x in self.memory]
-            partition_indices = np.argpartition(scores, -n)
-            # Get the top k indices
-            sample = partition_indices[-n:]
-            sample = [self.memory[i] for i in sample]
-            smiles = [x[0] for x in sample]
-            scores = [x[1] for x in sample]
-            prior_likelihood = [x[2] for x in sample]
-        tokenized = [self.voc.tokenize(selfies) for selfies in smiles] #### oov 
-        encoded = [Variable(self.voc.encode(tokenized_i)) for tokenized_i in tokenized]
-        encoded = MolData.collate_fn(encoded)
-        return encoded, np.array(scores), np.array(prior_likelihood)
-
     def sample(self, n):
         """Sample a batch size n of experience"""
         if len(self.memory)<n:
@@ -374,7 +356,3 @@ if __name__ == "__main__":
     print("Constructing vocabulary...")
     voc_chars = construct_vocabulary(smiles_list)
     write_smiles_to_file(smiles_list, "data/mols_filtered.smi")
-
-
-
-

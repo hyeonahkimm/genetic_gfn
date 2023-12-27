@@ -8,12 +8,7 @@ from main.optimizer import BaseOptimizer
 from utils import Variable, seq_to_smiles, unique
 from model import RNN
 from data_structs import Vocabulary, Experience, MolData
-from priority_queue import MaxRewardPriorityQueue
 import torch
-
-from joblib import Parallel
-from graph_ga_expert import GeneticOperatorHandler
-# from smiles_ga_expert import GeneticOperatorHandler as SmilesGA
 
 
 def canonicalize(smiles):
@@ -26,11 +21,11 @@ def canonicalize(smiles):
     return canonicalized
 
 
-class REINVENT_GA_Optimizer(BaseOptimizer):
+class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
 
     def __init__(self, args=None):
         super().__init__(args)
-        self.model_name = "reinvent_ga"
+        self.model_name = "reinvent_ls_gfn"
 
     def _optimize(self, oracle, config):
 
@@ -69,18 +64,11 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
         # occur more often (which means the agent can get biased towards them). Using experience replay is
         # therefor not as theoretically sound as it is for value based RL, but it seems to work well.
         experience = Experience(voc, max_size=config['num_keep'])
-        # ga_experience = Experience(voc, max_size=config['num_keep'])
-        # experience = MaxRewardPriorityQueue()
-
-        ga_handler = GeneticOperatorHandler(mutation_rate=config['mutation_rate'], 
-                                            population_size=config['population_size'])
-        pool = Parallel(n_jobs=config['num_jobs'])
 
         print("Model initialized, starting training...")
 
         step = 0
         patience = 0
-        prev_max = 0.
         prev_n_oracles = 0
         stuck_cnt = 0
 
@@ -94,7 +82,6 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
             
             # Sample from Agent
             seqs, agent_likelihood, entropy = Agent.sample(config['batch_size'])
-            # seqs, agent_likelihood, entropy = Agent.sample(config['batch_size'], temp = 1. + float(config['dynamic_temp']) * min(stuck_cnt, 10) * 0.1)
 
             # Remove duplicates, ie only consider unique seqs
             unique_idxs = unique(seqs)
@@ -108,15 +95,6 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
             if config['canonicalize']:
                 smiles = canonicalize(smiles)
             score = np.array(self.oracle(smiles))
-
-            # delta_score = np.clip(score.max() - prev_max, a_min = 0, a_max = 0.5)
-            # if prev_max < score.max():
-            #     prev_max = score.max()
-            #     stuck_cnt = 0
-            #     print('NN:', score.max(), score.mean(), score.std(), len(score))
-            # else:
-            #     stuck_cnt += 1
-            # print('NN:', score.max(), score.mean(), score.std(), len(score))
 
             if self.finish:
                 print('max oracle hit')
@@ -146,94 +124,42 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                     break
             
             prev_n_oracles = len(self.oracle)
-
-            # Calculate augmented likelihood
-            # augmented_likelihood = prior_likelihood.float() + 500 * Variable(score).float()
-            # reinvent_loss = torch.pow((augmented_likelihood - agent_likelihood), 2)
-            # print('REINVENT:', reinvent_loss.mean().item())
-
-            # forward_flow = agent_likelihood + log_z
-            # backward_flow = Variable(score).float() * config['beta']
-            # loss = torch.pow(forward_flow-backward_flow, 2).mean()
-
-
-            # Then add new experience
-            # prior_likelihood = prior_likelihood.data.cpu().numpy()
-            # new_experience = zip(smiles, score, prior_likelihood)
             
-            if not config['canonicalize']:
-                num_atoms = []
-                for s in smiles:
-                    try:
-                        mol = Chem.MolFromSmiles(s)
-                        num_atoms.append(mol.GetNumAtoms())
-                    except:
-                        num_atoms.append(1)
-                new_experience = zip(smiles, score, num_atoms)
-            else:
-                new_experience = zip(smiles, score)
+            new_experience = zip(smiles, score)
             experience.add_experience(new_experience)
 
-            # experience.add_list(seqs=seqs, smis=smiles, scores=score)
-            # experience.squeeze_by_kth(k=config['num_keep'])
+            # Local Search
+            if config['canonicalize']:
+                encoded = []
+                for i, smile in enumerate(smiles):
+                    try:
+                        tokenized = voc.tokenize(smile)
+                        encoded.append(Variable(voc.encode(tokenized)))
+                    except:
+                        pass
+                encoded = MolData.collate_fn(encoded)
+            else:
+                encoded = seqs
+            # min_len = torch.nonzero(encoded)[:, 1].min()
+            partial_len = int(encoded.shape[1]//2)
+            destroyed_seqs = encoded[:, :partial_len]
+            repaired_seqs, _, _ = Agent.sample_start_from(destroyed_seqs)
+            repaired_smiles = seq_to_smiles(repaired_seqs, voc)
+            if config['canonicalize']:
+                repaired_smiles = canonicalize(repaired_smiles)
+            repaired_score = np.array(self.oracle(repaired_smiles))
+            accept_mask = repaired_score > score
+            # print(len(repaired_smiles), accept_mask.sum())
 
-            if config['population_size'] and len(self.oracle) > config['population_size']:
-                if config['ga_sample_from'] == 'experience':
-                    pop_smis, pop_scores = experience.get_elems()
-                elif config['ga_sample_from'] == 'sample':
-                    pop_smis, pop_scores = smiles, score
-                else:
-                    self.oracle.sort_buffer()
-                    pop_smis, pop_scores = tuple(map(list, zip(*[(smi, elem[0]) for (smi, elem) in self.oracle.mol_buffer.items()])))
-                # print(list(self.oracle.mol_buffer))
-                mating_pool = (pop_smis[:config['num_keep']], pop_scores[:config['num_keep']])
+            new_experience = zip([repaired_score[j] for j in accept_mask.nonzero()], repaired_score[accept_mask])
+            experience.add_experience(new_experience)
 
-                for g in range(config['ga_generations']):
-                    child_smis, child_n_atoms, pop_smis, pop_scores = ga_handler.query(
-                            # query_size=50, mating_pool=mating_pool, pool=pool, return_pop=True
-                            query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, 
-                            rank_coefficient=config['rank_coefficient'], 
-                            blended=config['blended_ga'],
-                            # mutation_rate = config['mutation_rate'] + float(config['dynamic_temp']) * delta_score
-                            low_score_ratio = config['low_score_ratio']
-                        )
+            # assert False
 
-                    # child_smis = list(set(child_smis))
-                    child_score = np.array(self.oracle(child_smis))
-                    
-                    # high_smis, high_score = [], []
-                    # for idx, s in enumerate(score):
-                    #     if s > prev_max:
-                    #         # new_experience = zip(smis[idx], s)
-                    #         high_smis.append(smis[idx])
-                    #         high_score.append(s)
-                    
-                    if not config['canonicalize']:
-                        new_experience = zip(child_smis, child_score, child_n_atoms)
-                    else:
-                        new_experience = zip(child_smis, child_score)
-                    experience.add_experience(new_experience)
-
-                    mating_pool = (pop_smis+child_smis, pop_scores+child_score.tolist())
-
-                    # delta_score = np.clip(score.max() - prev_max, a_min = 0, a_max = 0.5)
-                    # if prev_max < score.max():
-                    #     prev_max = score.max()
-                    #     stuck_cnt = 0
-                    # else:
-                    #     stuck_cnt += 1
-                    # print('GA' + str(g+1) + ':', child_score.max(), child_score.mean(), child_score.std(), len(child_smis))
-
-                    if self.finish:
-                        print('max oracle hit')
-                        break
-                
-                # if config['ga_generations'] > 1:
-                #     smis, score = ga_handler.get_final_population(mating_pool)
-                # new_experience = zip(mating_pool[0], mating_pool[1])
-                # new_experience = zip(child_smis, child_score)
-                # experience.add_experience(new_experience)
-
+            if self.finish:
+                print('max oracle hit')
+                break
+            
             
             # Experience Replay
             # First sample
@@ -266,9 +192,6 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
 
                     exp_forward_flow = exp_agent_likelihood + log_z
                     exp_backward_flow = reward * config['beta']
-                    if not config['canonicalize']:
-                        # print(exp_pb)
-                        exp_backward_flow += torch.tensor(np.log(1/exp_pb)).cuda()  # approximated uniform pb
                     loss = torch.pow(exp_forward_flow - exp_backward_flow, 2).mean()
 
                     # Add regularizer that penalizes high likelihood for the entire sequence (from REINVENT)

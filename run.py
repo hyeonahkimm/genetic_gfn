@@ -124,6 +124,10 @@ def main():
         from main.reinvent_ga.run import REINVENT_GA_Optimizer as Optimizer
     elif args.method == "reinvent_ga_selfies":
         from main.reinvent_ga_selfies.run import REINVENT_GA_SELFIES_Optimizer as Optimizer
+    elif args.method == "reinvent_ls_gfn":
+        from main.reinvent_ga.run_ls_gfn import REINVENT_LS_GFN_Optimizer as Optimizer
+        path_main = os.path.dirname(os.path.realpath(__file__))
+        path_main = os.path.join(path_main, "main", "reinvent_ga")
     else:
         raise ValueError("Unrecognized method name.")
 

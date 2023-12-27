@@ -10,7 +10,6 @@ from model import RNN
 from data_structs import Vocabulary, Experience
 import torch
 
-from symrd_utils import make_symmetric_selfies, seq_to_selfies
 from tdc.chem_utils import MolConvert
 selfies2smiles = MolConvert(src = 'SELFIES', dst = 'SMILES')
 smiles2selfies = MolConvert(src = 'SMILES', dst = 'SELFIES')
@@ -53,7 +52,7 @@ class REINVENT_SELFIES_Optimizer(BaseOptimizer):
         # For policy based RL, we normally train on-policy and correct for the fact that more likely actions
         # occur more often (which means the agent can get biased towards them). Using experience replay is
         # therefor not as theoretically sound as it is for value based RL, but it seems to work well.
-        experience = Experience(voc, max_size=config['buffer_size'])
+        experience = Experience(voc)
 
         print("Model initialized, starting training...")
 
@@ -113,17 +112,10 @@ class REINVENT_SELFIES_Optimizer(BaseOptimizer):
 
             # Experience Replay
             # First sample
-            if config['experience_replay'] and len(experience) > config['experience_replay']:
+            if config['experience_replay'] and len(experience)>config['experience_replay']:
                 # exp_seqs, exp_score, exp_prior_likelihood = experience.sample(config['experience_replay']) #### old ---- bug  
                 exp_seqs, exp_score, exp_prior_likelihood = experience.sample_selfies(config['experience_replay']) #### new ---- 
-                
-                # if config['symmetric_distil']:
-                #     exp_seqs = make_symmetric_selfies(exp_seqs, voc)
-                #     exp_prior_likelihood, _ = Prior.likelihood(exp_seqs.long())
-                #     exp_prior_likelihood = exp_prior_likelihood.data.cpu().numpy()
-                #     exp_agent_likelihood, exp_entropy = Agent.likelihood(exp_seqs.long())
                 exp_agent_likelihood, exp_entropy = Agent.likelihood(exp_seqs.long())
-                
                 exp_augmented_likelihood = exp_prior_likelihood + config['sigma'] * exp_score
                 exp_loss = torch.pow((Variable(exp_augmented_likelihood) - exp_agent_likelihood), 2)
                 loss = torch.cat((loss, exp_loss), 0)
@@ -148,31 +140,8 @@ class REINVENT_SELFIES_Optimizer(BaseOptimizer):
             loss.backward()
             optimizer.step()
 
-            ################################ [SymRD] ###################################
-            if config['distil_every'] > 0 and (step + 1) % config['distil_every'] == 0 and len(experience) > config['distil_size']:
-                for _ in range(config['distil_loop']):
-                    if config['sampling'] == 'topk':
-                        exp_seqs, _, exp_prior_likelihood = experience.topk_selfies(config['distil_size'])
-                    elif config['sampling'] == 'reward_prioritized':
-                        exp_seqs, _, exp_prior_likelihood = experience.sample_selfies(config['distil_size'])
-                    elif config['sampling'] == 'greedy':
-                        exp_seqs, _, _ = Agent.sample(config['batch_size'], greedy=True)
-
-                    if config['symmetric_distil']:
-                        exp_seqs = make_symmetric_selfies(exp_seqs, voc)
-
-                    exp_agent_likelihood, exp_entropy = Agent.likelihood(exp_seqs.long())
-                    distil_loss = (-1) * config['distil_coefficient'] * exp_agent_likelihood.mean()
-
-                    # Calculate gradients and make an update to the network weights
-                    optimizer.zero_grad()
-                    distil_loss.backward()
-                    optimizer.step()
-            ###############################################################################
-
             # Convert to numpy arrays so that we can print them
             augmented_likelihood = augmented_likelihood.data.cpu().numpy()
             agent_likelihood = agent_likelihood.data.cpu().numpy()
 
             step += 1
-
