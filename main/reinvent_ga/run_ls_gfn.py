@@ -141,7 +141,7 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
             else:
                 encoded = seqs
             # min_len = torch.nonzero(encoded)[:, 1].min()
-            partial_len = int(encoded.shape[1]//2)
+            partial_len = int(torch.nonzero(encoded)[:, 1].min()//2)
             destroyed_seqs = encoded[:, :partial_len]
             repaired_seqs, _, _ = Agent.sample_start_from(destroyed_seqs)
             repaired_smiles = seq_to_smiles(repaired_seqs, voc)
