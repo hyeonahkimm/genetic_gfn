@@ -6,5 +6,3 @@ experience_replay: 64
 lr_z: 0.1
 beta: 50
 rank_coefficient: 0.01
-penalty: kl
-canonicalize: True

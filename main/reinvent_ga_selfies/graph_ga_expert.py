@@ -138,7 +138,7 @@ class GeneticOperatorHandler:
         for m in offspring_mol:
             try:
                 # smis.append(Chem.MolToSmiles(m))
-                smi = Chem.MolToSmiles(m, canonical=True)
+                smi = Chem.MolToSmiles(m)
                 encoded = sf.encoder(smi)
                 if encoded not in selfies:  # unique
                     selfies.append(encoded)
@@ -153,7 +153,7 @@ class GeneticOperatorHandler:
         for m, s in zip(new_mating_pool, new_mating_scores):
             try:
                 # pop_valid_smis.append(Chem.MolToSmiles(m))
-                pop_valid_smis.append(Chem.MolToSmiles(m, canonical=True))
+                pop_valid_smis.append(Chem.MolToSmiles(m))
                 pop_valid_scores.append(s)
             except:
                 pass

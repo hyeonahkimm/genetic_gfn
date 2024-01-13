@@ -20,20 +20,6 @@ selfies2smiles = MolConvert(src = 'SELFIES', dst = 'SMILES')
 smiles2selfies = MolConvert(src = 'SMILES', dst = 'SELFIES')
 
 
-def canonicalize(selfies):
-    canonicalized_selfies = []
-    canonicalized_smiles = []
-    smiles = selfies2smiles(selfies)
-    for s in smiles:
-        try:
-            smi = Chem.MolToSmiles(Chem.MolFromSmiles(s), canonical=True)
-            canonicalized_selfies.append(sf.encoder(smi))
-            canonicalized_smiles.append(smi)
-        except:
-            canonicalized_selfies.append(s)
-    return canonicalized_selfies, canonicalized_smiles
-
-
 class REINVENT_GA_SELFIES_Optimizer(BaseOptimizer):
 
     def __init__(self, args=None):
@@ -116,8 +102,9 @@ class REINVENT_GA_SELFIES_Optimizer(BaseOptimizer):
             ##### new 
             selfies_list = seq_to_selfies(seqs, voc) 
             smiles_list = selfies2smiles(selfies_list)
-            can_selfies, can_smiles = canonicalize(selfies_list)
-            score = np.array(self.oracle(can_smiles))
+            # can_selfies, can_smiles = canonicalize(selfies_list)
+            # score = np.array(self.oracle(can_smiles))
+            score = np.array(self.oracle(smiles_list))
             ##### new 
 
             # print('NN:', score.max(), score.mean(), score.std(), len(score))
@@ -151,7 +138,7 @@ class REINVENT_GA_SELFIES_Optimizer(BaseOptimizer):
             
             prev_n_oracles = len(self.oracle)
 
-            new_experience = zip(can_selfies, score) ## new 
+            new_experience = zip(selfies_list, score) ## new 
             experience.add_experience(new_experience)
 
             if config['population_size'] and len(self.oracle) > config['population_size']:
@@ -163,7 +150,7 @@ class REINVENT_GA_SELFIES_Optimizer(BaseOptimizer):
                 for g in range(config['ga_generations']):
                     child_selfies, child_smiles, pop_smis, pop_scores = ga_handler.query(
                             query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, 
-                            rank_coefficient=config['rank_coefficient'], 
+                            rank_coefficient=config['rank_coefficient'],
                         )
 
                     # child_smis = list(set(child_smis))
@@ -190,12 +177,12 @@ class REINVENT_GA_SELFIES_Optimizer(BaseOptimizer):
 
                     reward = torch.tensor(exp_score).cuda()
 
-                    if config['penalty'] == 'kl':
-                        reward -= 0.001 * (exp_agent_likelihood - prior_agent_likelihood)
-                    
                     exp_forward_flow = exp_agent_likelihood + log_z
                     exp_backward_flow = reward * config['beta']
                     loss = torch.pow(exp_forward_flow - exp_backward_flow, 2).mean()
+
+                    # kl penalty
+                    loss += 0.001 * (exp_agent_likelihood - prior_agent_likelihood).mean()
 
                     avg_loss += loss.item()/config['experience_loop']
 

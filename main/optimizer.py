@@ -310,7 +310,7 @@ class BaseOptimizer:
 
     def reset(self):
         del self.oracle
-        self.oracle = Oracle(args=self.args)
+        self.oracle = Oracle(args=self.args, mol_buffer={})
 
     @property
     def mol_buffer(self):
@@ -336,6 +336,7 @@ class BaseOptimizer:
                     for seed in seeds:
                         np.random.seed(seed)
                         torch.manual_seed(seed)
+                        torch.cuda.manual_seed_all(seed)
                         random.seed(seed)
                         config = wandb.config
                         self._optimize(oracle, config)
@@ -345,8 +346,8 @@ class BaseOptimizer:
                 wandb.log({"avg_auc": avg_auc})
             
         sweep_id = wandb.sweep(hparam_space)
-        # wandb.agent(sweep_id, function=_func, count=count, project=self.model_name + "_" + oracle.name)
-        wandb.agent(sweep_id, function=_func, count=count, entity="mol_opt")
+        wandb.agent(sweep_id, function=_func, count=count, project='uncategorized')
+        # wandb.agent(sweep_id, function=_func, count=count)
         
     def optimize(self, oracle, config, seed=0, project="test"):
         # run = wandb.init(project=project, config=config, reinit=True, entity="mol_opt")
@@ -359,6 +360,7 @@ class BaseOptimizer:
         # wandb.run.name = self.model_name + "_" + oracle.name + "_" + wandb.run.id
         np.random.seed(seed)
         torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
         random.seed(seed)
         self.seed = seed 
         self.oracle.task_label = self.model_name + "_" + oracle.name + "_" + str(seed)

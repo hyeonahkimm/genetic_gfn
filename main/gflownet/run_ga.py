@@ -76,6 +76,7 @@ class Dataset:
             break
         if not isinstance(m, BlockMoleculeDataExtended):
             m = m[-1]
+        
         r = m.reward
         done = 1
         samples = []
@@ -96,7 +97,7 @@ class Dataset:
     def set_sampling_model(self, model, proxy_reward, sample_prob=0.5):
         self.sampling_model = model
         self.sampling_model_prob = sample_prob
-        self.proxy_reward = proxy_reward #### only used in self._get_reward
+        self.proxy_reward = proxy_reward #### only used in self._get_reward  # oracle
 
     def _get_sample_model(self):
         m = BlockMoleculeDataExtended()
@@ -150,8 +151,9 @@ class Dataset:
             p, qp[0], qp[1][:, 0],
             torch.tensor(samples[-1][1], device=self._device).long())
         inflow = torch.logsumexp(qsa_p.flatten(), 0).item()
+        
         self.sampled_mols.append((r, m, trajectory_stats, inflow))
-        if self.replay_mode == 'online' or self.replay_mode == 'prioritized':
+        if self.replay_mode in ['online', 'prioritized', 'reward_prioritized']:
             m.reward = r
             self._add_mol_to_online(r, m, inflow)
         return samples
@@ -167,6 +169,13 @@ class Dataset:
             self.online_mols.append((abs(inflow - np.log(r)), m)) ##### sampling weight 
             if len(self.online_mols) > self.max_online_mols * 1.1:
                 self.online_mols = self.online_mols[-self.max_online_mols:]
+        elif self.replay_mode == 'reward_prioritized':
+            self.online_mols.append((r, m)) ##### sampling weight 
+            if len(self.online_mols) > self.max_online_mols * 1.1:
+                self.online_mols = self.online_mols[-self.max_online_mols:]
+        
+        # elif self.replay_mode == 'topk':
+
 
     def _get_reward(self, m):
         rdmol = m.mol
@@ -184,7 +193,7 @@ class Dataset:
         elif self.replay_mode == 'online':  ##### random sampling from online 
             eidx = np.random.randint(0, max(1,len(self.online_mols)), n)
             samples = sum((self._get(i, self.online_mols) for i in eidx), [])
-        elif self.replay_mode == 'prioritized': #### weight sampling. see _add_mol_to_online above 
+        elif self.replay_mode in ['prioritized', 'reward_prioritized']: #### weight sampling. see _add_mol_to_online above 
             if not len(self.online_mols):
                 # _get will sample from the model
                 samples = sum((self._get(0, self.online_mols) for i in range(n)), [])
@@ -193,6 +202,17 @@ class Dataset:
                 prio = np.float32([i[0] for i in self.online_mols])  #### sampling weight, see _add_mol_to_online above 
                 eidx = np.random.choice(len(self.online_mols), n, False, prio/prio.sum()) 
                 samples = sum((self._get(i, self.online_mols) for i in eidx), [])
+        # elif self.replay_mode == 'topk': #### topk 
+        #     if not len(self.online_mols):
+        #         # _get will sample from the model
+        #         samples = sum((self._get(0, self.online_mols) for i in range(n)), [])
+        #     else:
+        #         ##### weight sampling 
+        #         prio = np.float32([i[0] for i in self.online_mols])  #### sampling weight, see _add_mol_to_online above 
+        #         partition_indices = np.argpartition(scores, -n)
+        #         eidx = np.random.choice(len(self.online_mols), n, False, prio/prio.sum()) 
+        #         samples = sum((self._get(i, self.online_mols) for i in eidx), [])
+
         return zip(*samples)
         # return samples
 
@@ -399,6 +419,7 @@ class GFlowNet_Optimizer(BaseOptimizer):
             else:
                 old_scores = 0
 
+            # sample from models
             ####### 1. data ########
             if not debug_no_threads:
                 r = sampler() ### sampler = dataset.start_samplers(8, mbsize)   see above. 
@@ -411,6 +432,22 @@ class GFlowNet_Optimizer(BaseOptimizer):
             else:
                 p, pb, a, r, s, d, mols = dataset.sample2batch(dataset.sample(mbsize)) #### see dataset.sample 
             ####### 1. data ########
+
+            # GA exploration
+            dataset.online_mols
+
+            # get samples from online mol buffer
+            dataset.set_sampling_model(model, self.oracle, sample_prob=0.)
+            if not debug_no_threads:
+                r = sampler() ### sampler = dataset.start_samplers(8, mbsize)   see above. 
+                for thread in dataset.sampler_threads:
+                    if thread.failed:
+                        stop_everything()
+                        pdb.post_mortem(thread.exception.__traceback__)
+                        return
+                p, pb, a, r, s, d, mols = r
+            else:
+                p, pb, a, r, s, d, mols = dataset.sample2batch(dataset.sample(mbsize)) #### see dataset.sample 
 
             ####### 2. model ######
             # Since we sampled 'mbsize' trajectories, we're going to get roughly mbsize * H (H is variable) transitions
@@ -448,6 +485,7 @@ class GFlowNet_Optimizer(BaseOptimizer):
                 loss = term_loss * leaf_coef + flow_loss
             else:
                 loss = losses.mean()
+
             opt.zero_grad()
             loss.backward(retain_graph=(not i % 50))
 
@@ -480,6 +518,81 @@ class GFlowNet_Optimizer(BaseOptimizer):
             opt.step()
             model.training_steps = i + 1
             ###### optimizer #####
+
+            if config.distillation and (i % config.distil_period) == 0:
+                # replay buffer
+                dataset.set_sampling_model(model, self.oracle, sample_prob=0.)
+                ####### 1. data ########
+                if not debug_no_threads:
+                    r = sampler() ### sampler = dataset.start_samplers(8, mbsize)   see above. 
+                    for thread in dataset.sampler_threads:
+                        if thread.failed:
+                            stop_everything()
+                            pdb.post_mortem(thread.exception.__traceback__)
+                            return
+                    p, pb, a, r, s, d, mols = r
+                else:
+                    p, pb, a, r, s, d, mols = dataset.sample2batch(dataset.sample(mbsize)) #### see dataset.sample 
+                ####### 1. data ########
+
+                ####### 2. model ######
+                # Since we sampled 'mbsize' trajectories, we're going to get roughly mbsize * H (H is variable) transitions
+                ntransitions = r.shape[0]
+                # state outputs
+                if tau > 0:
+                    with torch.no_grad():
+                        stem_out_s, mol_out_s = target_model(s, None)
+                else:
+                    stem_out_s, mol_out_s = model(s, None)
+                
+                
+                # parents of the state outputs
+                stem_out_p, mol_out_p = model(p, None)
+                nll = model.action_negloglikelihood(p, a, stem_out_p, mol_out_p)
+                il_loss = (config.distil_coefficient * nll).mean()
+                # print(i, il_loss.item())
+                opt.zero_grad()
+                il_loss.backward()
+
+                dataset.set_sampling_model(model, self.oracle, sample_prob=config.sample_prob)
+                # else:
+                #     # index parents by their corresponding actions
+                #     qsa_p = model.index_output_by_action(p, stem_out_p, mol_out_p[:, 0], a)
+                #     # then sum the parents' contribution, this is the inflow
+                #     exp_inflow = (torch.zeros((ntransitions,), device=device, dtype=dataset.floatX)
+                #                 .index_add_(0, pb, torch.exp(qsa_p))) # pb is the parents' batch index
+                #     inflow = torch.log(exp_inflow + log_reg_c)
+                #     # sum the state's Q(s,a), this is the outflow
+                #     exp_outflow = model.sum_output(s, torch.exp(stem_out_s), torch.exp(mol_out_s[:, 0]))
+                #     # include reward and done multiplier, then take the log
+                #     # we're guarenteed that r > 0 iff d = 1, so the log always works
+                #     outflow_plus_r = torch.log(log_reg_c + r + exp_outflow * (1-d))
+                #     if do_nblocks_reg:
+                #         losses_rb = _losses_rb = ((inflow - outflow_plus_r) / (s.nblocks * max_blocks)).pow(2)
+                #     else:
+                #         losses_rb = _losses_rb = (inflow - outflow_plus_r).pow(2)
+                #     if clip_loss > 0:
+                #         ld = losses_rb.detach()
+                #         losses_rb = losses_rb / ld * torch.minimum(ld, clip_loss)
+
+                #     term_loss_rb = (losses_rb * d).sum() / (d.sum() + 1e-20)
+                #     flow_loss_rb = (losses_rb * (1-d)).sum() / ((1-d).sum() + 1e-20)
+                #     if balanced_loss:
+                #         rb_loss = term_loss_rb * leaf_coef + flow_loss_rb
+                #     else:
+                #         rb_loss = losses_rb.mean()
+                #     opt.zero_grad()
+                #     loss.backward(retain_graph=(not i % 50))
+
+                # ###### optimizer #####
+                # if config.clip_grad > 0:
+                #     torch.nn.utils.clip_grad_value_(model.parameters(),
+                #                                     config.clip_grad)
+                # opt.step()
+                # model.training_steps = i + 1
+                ###### optimizer #####
+
+                # dataset.set_sampling_model(model, self.oracle, sample_prob=config.sample_prob)
 
             ##### update target_model #######
             if tau > 0:

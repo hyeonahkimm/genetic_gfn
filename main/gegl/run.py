@@ -79,6 +79,7 @@ class GEGL_Optimizer(BaseOptimizer):
             with torch.no_grad():
                 apprentice_handler.model.eval()
                 smis, _, _, _ = apprentice_handler.sample(
+                    # num_samples=config['expert_sampling_batch_size'], device=device  # for tuning 
                     num_samples=config['apprentice_sampling_batch_size'], device=device
                 )
             

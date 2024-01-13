@@ -11,16 +11,6 @@ from data_structs import Vocabulary, Experience, MolData
 import torch
 
 
-def canonicalize(smiles):
-    canonicalized = []
-    for s in smiles:
-        try:
-            canonicalized.append(Chem.MolToSmiles(Chem.MolFromSmiles(s), canonical=True))
-        except:
-            canonicalized.append(s)
-    return canonicalized
-
-
 class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
 
     def __init__(self, args=None):
@@ -92,8 +82,6 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
             # Get prior likelihood and score
             prior_likelihood, _ = Prior.likelihood(Variable(seqs))
             smiles = seq_to_smiles(seqs, voc)
-            if config['canonicalize']:
-                smiles = canonicalize(smiles)
             score = np.array(self.oracle(smiles))
 
             if self.finish:
@@ -129,26 +117,28 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
             experience.add_experience(new_experience)
 
             # Local Search
-            if config['canonicalize']:
-                encoded = []
-                for i, smile in enumerate(smiles):
-                    try:
-                        tokenized = voc.tokenize(smile)
-                        encoded.append(Variable(voc.encode(tokenized)))
-                    except:
-                        pass
-                encoded = MolData.collate_fn(encoded)
-            else:
-                encoded = seqs
+            # if config['canonicalize']:
+            #     encoded = []
+            #     for i, smile in enumerate(smiles):
+            #         try:
+            #             tokenized = voc.tokenize(smile)
+            #             encoded.append(Variable(voc.encode(tokenized)))
+            #         except:
+            #             pass
+            #     encoded = MolData.collate_fn(encoded)
+            # else:
+            encoded = seqs
             # min_len = torch.nonzero(encoded)[:, 1].min()
             partial_len = int(torch.nonzero(encoded)[:, 1].min()//2)
             destroyed_seqs = encoded[:, :partial_len]
             repaired_seqs, _, _ = Agent.sample_start_from(destroyed_seqs)
             repaired_smiles = seq_to_smiles(repaired_seqs, voc)
-            if config['canonicalize']:
-                repaired_smiles = canonicalize(repaired_smiles)
             repaired_score = np.array(self.oracle(repaired_smiles))
-            accept_mask = repaired_score > score
+        
+            try:
+                accept_mask = repaired_score > score  # size mismathes (rarely)
+            except:
+                accept_mask = np.array([False] * len(repaired_score))
             # print(len(repaired_smiles), accept_mask.sum())
 
             new_experience = zip([repaired_smiles[j] for j in accept_mask.nonzero()[0]], repaired_score[accept_mask])
@@ -174,69 +164,23 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
                         # exp_seqs, exp_score, exp_pb = experience.rank_based_sample(config['experience_replay'], config['rank_coefficient'], return_pb=~config['canonical'])
                     else:
                         exp_seqs, exp_score = experience.sample(config['experience_replay'])
-                    # exp_seqs, exp_smis, exp_score = experience.sample_batch(config['experience_replay']) 
-                    # tokenized = [voc.tokenize(smile) for smile in smiles]
-                    # encoded = [Variable(voc.encode(tokenized_i)) for tokenized_i in tokenized]
-                    # encoded = MolData.collate_fn(encoded)
                     exp_agent_likelihood, _ = Agent.likelihood(exp_seqs.long())
                     prior_agent_likelihood, _ = Prior.likelihood(exp_seqs.long())
-                    # exp_augmented_likelihood = exp_prior_likelihood + config['sigma'] * exp_score
-                    # exp_loss = torch.pow((Variable(exp_augmented_likelihood) - exp_agent_likelihood), 2)
-                    # loss = torch.cat((loss, exp_loss), 0)
-                    # agent_likelihood = torch.cat((agent_likelihood, exp_agent_likelihood), 0)
 
                     reward = torch.tensor(exp_score).cuda()
-                    if config['penalty'] == 'kl':
-                        # print((exp_agent_likelihood - prior_agent_likelihood).mean())
-                        reward -= 0.001 * (exp_agent_likelihood - prior_agent_likelihood)
 
                     exp_forward_flow = exp_agent_likelihood + log_z
                     exp_backward_flow = reward * config['beta']
                     loss = torch.pow(exp_forward_flow - exp_backward_flow, 2).mean()
 
-                    # Add regularizer that penalizes high likelihood for the entire sequence (from REINVENT)
-                    if config['penalty'] == 'REINVENT':
-                        # print(torch.nn.functional.mse_loss(exp_agent_likelihood, prior_agent_likelihood))
-                        loss_p = - (1 / exp_agent_likelihood).mean()
-                        # print('penalty:', loss_p.item())
-                        loss += 1e3 * loss_p
-                    elif config['penalty'] == 'prior_l2':
-                        loss_p = torch.nn.functional.mse_loss(exp_agent_likelihood, prior_agent_likelihood)
-                        loss += 1e-2 * loss_p
-                    elif config['penalty'] == 'prior_kl':
-                        loss_p = (exp_agent_likelihood.exp() * (exp_agent_likelihood - prior_agent_likelihood)).sum()
-                        # print(loss.item())
-                        # print(loss_p.item(), 1e-2 * torch.nn.functional.mse_loss(exp_agent_likelihood, prior_agent_likelihood).item(), 1e3 * (1 / exp_agent_likelihood).mean().item())
-                        loss += 1e2 * loss_p
-                    elif config['penalty'] == 'full_kl':
-                        loss_p = torch.nn.functional.kl_div(exp_agent_likelihood, prior_agent_likelihood, log_target=True, reduction="none").sum(-1)
-                        # print(loss_p.mean().item())
-                        loss += loss_p.mean()
+                    # kl penalty
+                    loss += 0.001 * (exp_agent_likelihood - prior_agent_likelihood).mean()
 
-                    # print(loss.item())
                     avg_loss += loss.item()/config['experience_loop']
 
                     optimizer.zero_grad()
                     loss.backward()
-                    # grad_norms = torch.nn.utils.clip_grad_norm_(Agent.rnn.parameters(), 1.0)
                     optimizer.step()
-            # print(avg_loss)
-
-            # Calculate loss
-            # loss = loss.mean()
-
-            # Add regularizer that penalizes high likelihood for the entire sequence
-            # loss_p = - (1 / agent_likelihood).mean()
-            # loss += 5 * 1e3 * loss_p
-
-            # Calculate gradients and make an update to the network weights
-            # optimizer.zero_grad()
-            # loss.backward()
-            # optimizer.step()
-
-            # Convert to numpy arrays so that we can print them
-            # augmented_likelihood = augmented_likelihood.data.cpu().numpy()
-            # agent_likelihood = agent_likelihood.data.cpu().numpy()
 
             step += 1
 

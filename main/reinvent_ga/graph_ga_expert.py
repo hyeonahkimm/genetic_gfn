@@ -102,7 +102,6 @@ def reproduce(mating_pool, mutation_rate):
 
 class GeneticOperatorHandler:
     def __init__(self, mutation_rate: float=0.067, population_size=200):
-        self.chromosome = 'graph'
         self.mutation_rate = mutation_rate
         self.population_size = population_size
 
@@ -110,7 +109,7 @@ class GeneticOperatorHandler:
         new_mating_pool, new_mating_scores, _, _ = make_mating_pool(mating_pool[0], mating_pool[1], self.population_size, rank_coefficient)
         return (new_mating_pool, new_mating_scores)
 
-    def query(self, query_size, mating_pool, pool, rank_coefficient=0.01, blended=False, mutation_rate=None, low_score_ratio=0.):
+    def query(self, query_size, mating_pool, pool, rank_coefficient=0.01, blended=False, mutation_rate=None, low_score_ratio=0., canonicalize=True):
         # print(mating_pool)
         if mutation_rate is None:
             mutation_rate = self.mutation_rate
@@ -136,7 +135,7 @@ class GeneticOperatorHandler:
         for m in offspring_mol:
             try:
                 # smis.append(Chem.MolToSmiles(m))
-                smi = Chem.MolToSmiles(m, canonical=True)
+                smi = Chem.MolToSmiles(m, canonical=canonicalize)
                 if smi not in smis:  # unique
                     smis.append(smi)
                     n_atoms.append(m.GetNumAtoms())
@@ -149,7 +148,7 @@ class GeneticOperatorHandler:
         for m, s in zip(new_mating_pool, new_mating_scores):
             try:
                 # pop_valid_smis.append(Chem.MolToSmiles(m))
-                pop_valid_smis.append(Chem.MolToSmiles(m, canonical=True))
+                pop_valid_smis.append(Chem.MolToSmiles(m, canonical=canonicalize))
                 pop_valid_scores.append(s)
             except:
                 pass
