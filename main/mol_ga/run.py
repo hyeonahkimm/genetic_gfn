@@ -18,10 +18,12 @@ class MolGAOptimizer(BaseOptimizer):
         self.oracle.assign_evaluator(oracle)
 
         kwargs = dict(
-            starting_population_smiles=random_zinc(1000),
+            starting_population_smiles=random_zinc(500),
             scoring_function=self.oracle,
             max_generations=config['max_generations'],
             offspring_size=config['offspring_size'],
+            population_size=50,
+            std_num_atoms = 1e2
         )
 
         if config['parallel']:

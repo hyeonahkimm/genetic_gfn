@@ -163,6 +163,7 @@ def crossover_non_ring(parent_A, parent_B):
 
 def crossover(parent_A, parent_B):
     parent_smiles = [Chem.MolToSmiles(parent_A, canonical=True), Chem.MolToSmiles(parent_B, canonical=True)]
+    # print(parent_smiles)
     if None in parent_smiles:
         print(parent_smiles)
         return None
@@ -175,18 +176,25 @@ def crossover(parent_A, parent_B):
 
     for i in range(10):
         if random.random() <= 0.5:
-            # print 'non-ring crossover'
-            new_mol = crossover_non_ring(parent_A, parent_B)
-            if new_mol is not None:
-                new_smiles = Chem.MolToSmiles(new_mol)
-                if new_smiles is not None and new_smiles not in parent_smiles:
-                    return new_mol
+            try:
+                # print 'non-ring crossover'
+                new_mol = crossover_non_ring(parent_A, parent_B)
+                if new_mol is not None:
+                    new_smiles = Chem.MolToSmiles(new_mol)
+                    # print(new_smiles)
+                    if new_smiles is not None and new_smiles not in parent_smiles:
+                        return new_mol
+            except:
+                pass
         else:
             # print 'ring crossover'
-            new_mol = crossover_ring(parent_A, parent_B)
-            if new_mol is not None:
-                new_smiles = Chem.MolToSmiles(new_mol)
-                if new_smiles is not None and new_smiles not in parent_smiles:
-                    return new_mol
+            try:
+                new_mol = crossover_ring(parent_A, parent_B)
+                if new_mol is not None:
+                    new_smiles = Chem.MolToSmiles(new_mol)
+                    if new_smiles is not None and new_smiles not in parent_smiles:
+                        return new_mol
+            except:
+                pass
 
     return None

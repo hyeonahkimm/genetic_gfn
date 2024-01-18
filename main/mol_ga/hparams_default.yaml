@@ -1,3 +1,3 @@
-max_generations: 200
-offspring_size: 100
+max_generations: 20000
+offspring_size: 5
 parallel: False

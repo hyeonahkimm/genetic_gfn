@@ -11,6 +11,6 @@ do
 for oralce in "${oracle_array[@]}"
 do
 # echo $oralce
-python run.py reinvent_ls_gfn --config_default hparams_ls_gfn.yaml --task simple --oracle $oralce --wandb online --run_name kl --seed $seed
+python run.py reinvent_ls_gfn --config_default hparams_ls_gfn.yaml --task simple --oracle $oralce --wandb online --run_name kl2 --seed $seed
 done
 done

@@ -4,7 +4,7 @@ num_keep: 1024
 experience_loop: 8
 experience_replay: 64
 lr_z: 0.1
-beta: 100
+beta: 10
 mutation_rate: 0.01
 population_size: 64
 offspring_size: 8
@@ -17,4 +17,4 @@ ga_sample_from: mol_buffer
 low_score_ratio: 0.
 canonicalize: True
 valid_only: True
-kl_coefficient: 0.001
+kl_coefficient: 0.01

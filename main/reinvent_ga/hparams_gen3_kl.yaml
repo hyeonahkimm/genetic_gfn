@@ -17,4 +17,4 @@ ga_sample_from: mol_buffer
 low_score_ratio: 0.
 canonicalize: True
 valid_only: True
-kl_coefficient: 0.001
+kl_coefficient: 0.01
