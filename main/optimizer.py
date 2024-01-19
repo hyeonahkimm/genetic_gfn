@@ -310,7 +310,7 @@ class BaseOptimizer:
 
     def reset(self):
         del self.oracle
-        self.oracle = Oracle(args=self.args)
+        self.oracle = Oracle(args=self.args, mol_buffer={})
 
     @property
     def mol_buffer(self):

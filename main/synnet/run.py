@@ -23,6 +23,12 @@ import scripts._mp_decode as decode
 from syn_net.utils.predict_utils import mol_fp
 from tqdm import tqdm 
 
+import rdkit.rdBase as rkrb
+import rdkit.RDLogger as rkl
+logger = rkl.logger()
+logger.setLevel(rkl.ERROR)
+rkrb.DisableLog('rdApp.error')
+
 
 def fitness(embs, _pool, obj):
     """
@@ -46,7 +52,7 @@ def fitness(embs, _pool, obj):
             embeddings.
     """
     results = _pool.map(decode.func, embs)
-    print("fitness decode finished")
+    # print("fitness decode finished")
     ### debug mode: without pool (parallel)
     # results = []
     # for emb in embs:
@@ -163,7 +169,6 @@ class SynNet_Optimizer(BaseOptimizer):
         patience = 0
 
         while True:
-
             n += 1
 
             if len(self.oracle) > 100:
