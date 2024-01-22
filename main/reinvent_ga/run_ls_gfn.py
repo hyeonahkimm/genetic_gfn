@@ -10,6 +10,8 @@ from model import RNN
 from data_structs import Vocabulary, Experience, MolData
 import torch
 
+from rdkit import Chem
+
 
 class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
 
@@ -117,17 +119,18 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
             experience.add_experience(new_experience)
 
             # Local Search
-            # if config['canonicalize']:
-            #     encoded = []
-            #     for i, smile in enumerate(smiles):
-            #         try:
-            #             tokenized = voc.tokenize(smile)
-            #             encoded.append(Variable(voc.encode(tokenized)))
-            #         except:
-            #             pass
-            #     encoded = MolData.collate_fn(encoded)
-            # else:
-            encoded = seqs
+            if config['canonicalize']:
+                encoded = []
+                for i, smi in enumerate(smiles):
+                    try:
+                        canonical = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
+                        tokenized = voc.tokenize(canonical)
+                        encoded.append(Variable(voc.encode(tokenized)))
+                    except:
+                        pass
+                encoded = MolData.collate_fn(encoded)
+            else:
+                encoded = seqs
             # min_len = torch.nonzero(encoded)[:, 1].min()
             partial_len = int(torch.nonzero(encoded)[:, 1].min()//2)
             destroyed_seqs = encoded[:, :partial_len]
@@ -174,7 +177,7 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
                     loss = torch.pow(exp_forward_flow - exp_backward_flow, 2).mean()
 
                     # kl penalty
-                    loss += 0.001 * (exp_agent_likelihood - prior_agent_likelihood).mean()
+                    loss += config['kl_coefficient'] * (exp_agent_likelihood - prior_agent_likelihood).mean()
 
                     avg_loss += loss.item()/config['experience_loop']
 

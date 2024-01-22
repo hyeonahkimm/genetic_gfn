@@ -11,6 +11,6 @@ do
 for oralce in "${oracle_array[@]}"
 do
 # echo $oralce
-CUDA_VISIBLE_DEVICES=3 python run.py reinvent_ls_gfn --config_default hparams_ls_gfn.yaml --task simple --oracle $oralce --wandb online --run_name canonicalize_kl2 --seed $seed
+CUDA_VISIBLE_DEVICES=3 python run.py reinvent_ls_gfn --config_default hparams_lsgfn_no.yaml --task simple --oracle $oralce --wandb online --run_name lsgfn_kl2 --seed $seed
 done
 done
