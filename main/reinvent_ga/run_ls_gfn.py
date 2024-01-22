@@ -133,7 +133,7 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
             else:
                 encoded = seqs
             
-            ls_avg_score = score.mean()
+            ls_avg_score = score.mean() / (config['ls_iter'] + 1)
             avg_accept_ratio = 0.
             for _ in range(config['ls_iter']):
                 # print((encoded == 0).nonzero()[:, 1].min(), encoded.shape)
@@ -142,7 +142,7 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
                 repaired_seqs, _, _ = Agent.sample_start_from(destroyed_seqs)
                 repaired_smiles = seq_to_smiles(repaired_seqs, voc)
                 repaired_score = np.array(self.oracle(repaired_smiles))
-                ls_avg_score += repaired_score.mean()/config['ls_iter']
+                ls_avg_score += repaired_score.mean()/(config['ls_iter'] + 1)
             
                 try:
                     accept_mask = repaired_score > score  # size mismathes (rarely)
