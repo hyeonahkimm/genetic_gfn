@@ -182,7 +182,7 @@ class REINVENT_GA_SELFIES_Optimizer(BaseOptimizer):
                     loss = torch.pow(exp_forward_flow - exp_backward_flow, 2).mean()
 
                     # kl penalty
-                    loss += 0.001 * (exp_agent_likelihood - prior_agent_likelihood).mean()
+                    loss += config['kl_coefficient'] * (exp_agent_likelihood - prior_agent_likelihood).mean()
 
                     avg_loss += loss.item()/config['experience_loop']
 

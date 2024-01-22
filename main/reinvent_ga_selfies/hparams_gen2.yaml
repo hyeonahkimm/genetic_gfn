@@ -11,3 +11,4 @@ offspring_size: 8
 ga_generations: 2
 rank_coefficient: 0.01
 num_jobs: 1
+kl_coefficient: 0.01

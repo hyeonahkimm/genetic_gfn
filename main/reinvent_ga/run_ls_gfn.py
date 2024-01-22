@@ -9,6 +9,7 @@ from utils import Variable, seq_to_smiles, unique
 from model import RNN
 from data_structs import Vocabulary, Experience, MolData
 import torch
+import wandb
 
 from rdkit import Chem
 
@@ -131,22 +132,42 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
                 encoded = MolData.collate_fn(encoded)
             else:
                 encoded = seqs
-            # min_len = torch.nonzero(encoded)[:, 1].min()
-            partial_len = int(torch.nonzero(encoded)[:, 1].min()//2)
-            destroyed_seqs = encoded[:, :partial_len]
-            repaired_seqs, _, _ = Agent.sample_start_from(destroyed_seqs)
-            repaired_smiles = seq_to_smiles(repaired_seqs, voc)
-            repaired_score = np.array(self.oracle(repaired_smiles))
-        
+            
+            ls_avg_score = score.mean()
+            avg_accept_ratio = 0.
+            for _ in range(config['ls_iter']):
+                # print((encoded == 0).nonzero()[:, 1].min(), encoded.shape)
+                partial_len = int((encoded).nonzero()[:, 1].max()//2)
+                destroyed_seqs = encoded[:, :partial_len]
+                repaired_seqs, _, _ = Agent.sample_start_from(destroyed_seqs)
+                repaired_smiles = seq_to_smiles(repaired_seqs, voc)
+                repaired_score = np.array(self.oracle(repaired_smiles))
+                ls_avg_score += repaired_score.mean()/config['ls_iter']
+            
+                try:
+                    accept_mask = repaired_score > score  # size mismathes (rarely)
+                except:
+                    accept_mask = torch.tensor([False] * len(repaired_score)).to(encoded.device)
+
+                avg_accept_ratio += torch.tensor(accept_mask).sum() / config['ls_iter']
+
+                if repaired_seqs.shape[1] < encoded.shape[1]:
+                    repaired_seqs = torch.cat([repaired_seqs, torch.zeros(encoded.shape[0], encoded.shape[1] - repaired_seqs.shape[1]).long().to(encoded.device)], dim=1)
+                else:
+                    encoded = torch.cat([encoded, torch.zeros(encoded.shape[0], repaired_seqs.shape[1] - encoded.shape[1]).long().to(encoded.device)], dim=1)
+
+                # print(torch.tensor(accept_mask).sum())
+                encoded = torch.where(torch.tensor(accept_mask)[:, None].to(encoded.device), repaired_seqs, encoded)
+
+                new_experience = zip(repaired_smiles, repaired_score)
+                experience.add_experience(new_experience)
+
             try:
-                accept_mask = repaired_score > score  # size mismathes (rarely)
+                wandb.log({'ls_avg_score': ls_avg_score, 
+                           'sample_avg_score': score.mean(),
+                           'accept_ratio':avg_accept_ratio})
             except:
-                accept_mask = np.array([False] * len(repaired_score))
-            # print(len(repaired_smiles), accept_mask.sum())
-
-            new_experience = zip([repaired_smiles[j] for j in accept_mask.nonzero()[0]], repaired_score[accept_mask])
-            experience.add_experience(new_experience)
-
+                pass
             # assert False
 
             if self.finish:
@@ -161,7 +182,7 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
                 for _ in range(config['experience_loop']):
                     if config['rank_coefficient'] >= 1:
                         # exp_seqs, exp_score = experience.quantile_uniform_sample(config['experience_replay'], 0.001)
-                        exp_seqs, exp_score, _ = experience.rank_based_sample(config['experience_replay'], 0.001)
+                        exp_seqs, exp_score, _ = experience.rank_based_sample(config['experience_replay'], 0.01)
                     elif config['rank_coefficient'] > 0:
                         exp_seqs, exp_score, _ = experience.rank_based_sample(config['experience_replay'], config['rank_coefficient'])
                         # exp_seqs, exp_score, exp_pb = experience.rank_based_sample(config['experience_replay'], config['rank_coefficient'], return_pb=~config['canonical'])

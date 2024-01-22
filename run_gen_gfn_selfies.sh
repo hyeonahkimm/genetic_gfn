@@ -6,7 +6,7 @@ oracle_array=('jnk3' 'drd2' 'qed' 'gsk3b' 'celecoxib_rediscovery' 'troglitazone_
         'fexofenadine_mpo' 'ranolazine_mpo' 'perindopril_mpo' 'amlodipine_mpo' \
         'sitagliptin_mpo' 'zaleplon_mpo' 'valsartan_smarts' 'deco_hop' 'scaffold_hop')
 
-for seed in 0 1 2
+for seed in 3 4
 do
 for oralce in "${oracle_array[@]}"
 do

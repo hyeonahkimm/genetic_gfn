@@ -1,5 +1,6 @@
 learning_rate: 0.0005
-batch_size: 64
+batch_size: 16
+ls_iter: 4
 num_keep: 1024
 experience_loop: 8
 experience_replay: 64
@@ -7,4 +8,4 @@ lr_z: 0.1
 beta: 50
 rank_coefficient: 0.01
 kl_coefficient: 0.01
-canonicalize: True
+canonicalize: False
