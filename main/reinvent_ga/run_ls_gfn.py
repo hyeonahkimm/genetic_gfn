@@ -135,16 +135,27 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
             
             ls_avg_score = score.mean() / (config['ls_iter'] + 1)
             avg_accept_ratio = 0.
-            # print(seqs)
             # assert False
             for _ in range(config['ls_iter']):
                 # print((encoded == 53).nonzero()[:, 1], encoded.shape)
                 # partial_len = int((encoded).nonzero()[:, 1].max()//2)
                 partial_len = ((encoded == 53).nonzero()[:, 1].min(dim=0)[0]*0.7).long()
                 # print(encoded.shape, partial_len, (encoded == 0).nonzero()[:, 1].min(dim=0)[0])
-                destroyed_seqs = encoded[:, :partial_len]
+                destroyed_seqs = encoded[:, :partial_len].long()
                 repaired_seqs, _, _ = Agent.sample_start_from(destroyed_seqs)
                 repaired_smiles = seq_to_smiles(repaired_seqs, voc)
+
+                if config['canonicalize']:
+                    repaired_seqs = []
+                    for i, smi in enumerate(smiles):
+                        try:
+                            canonical = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
+                            tokenized = voc.tokenize(canonical)
+                            repaired_seqs.append(Variable(voc.encode(tokenized)))
+                        except:
+                            pass
+                    repaired_seqs = MolData.collate_fn(repaired_seqs)
+
                 repaired_score = np.array(self.oracle(repaired_smiles))
                 ls_avg_score += repaired_score.mean()/(config['ls_iter'] + 1)
             

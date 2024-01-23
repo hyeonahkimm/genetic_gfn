@@ -1,6 +1,7 @@
 #!/bin/bash 
 
-oracle_array=('ranolazine_mpo' 'perindopril_mpo' 'amlodipine_mpo')
+oracle_array=(
+        'sitagliptin_mpo' 'zaleplon_mpo' 'valsartan_smarts' 'deco_hop' 'scaffold_hop')
 
 for seed in 4
 do
