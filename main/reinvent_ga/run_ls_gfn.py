@@ -135,9 +135,13 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
             
             ls_avg_score = score.mean() / (config['ls_iter'] + 1)
             avg_accept_ratio = 0.
+            # print(seqs)
+            # assert False
             for _ in range(config['ls_iter']):
-                # print((encoded == 0).nonzero()[:, 1].min(), encoded.shape)
-                partial_len = int((encoded).nonzero()[:, 1].max()//2)
+                # print((encoded == 53).nonzero()[:, 1], encoded.shape)
+                # partial_len = int((encoded).nonzero()[:, 1].max()//2)
+                partial_len = ((encoded == 53).nonzero()[:, 1].min(dim=0)[0]*0.7).long()
+                # print(encoded.shape, partial_len, (encoded == 0).nonzero()[:, 1].min(dim=0)[0])
                 destroyed_seqs = encoded[:, :partial_len]
                 repaired_seqs, _, _ = Agent.sample_start_from(destroyed_seqs)
                 repaired_smiles = seq_to_smiles(repaired_seqs, voc)
@@ -149,7 +153,8 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
                 except:
                     accept_mask = torch.tensor([False] * len(repaired_score)).to(encoded.device)
 
-                avg_accept_ratio += torch.tensor(accept_mask).sum() / config['ls_iter']
+                accept_mask = torch.tensor(accept_mask).to(encoded.device)
+                avg_accept_ratio += accept_mask.sum() / config['ls_iter']
 
                 if repaired_seqs.shape[1] < encoded.shape[1]:
                     repaired_seqs = torch.cat([repaired_seqs, torch.zeros(encoded.shape[0], encoded.shape[1] - repaired_seqs.shape[1]).long().to(encoded.device)], dim=1)
@@ -157,7 +162,8 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
                     encoded = torch.cat([encoded, torch.zeros(encoded.shape[0], repaired_seqs.shape[1] - encoded.shape[1]).long().to(encoded.device)], dim=1)
 
                 # print(torch.tensor(accept_mask).sum())
-                encoded = torch.where(torch.tensor(accept_mask)[:, None].to(encoded.device), repaired_seqs, encoded)
+                encoded = torch.where(accept_mask[:, None], repaired_seqs, encoded)
+                # encoded_score = torch.where(torch.tensor(accept_mask)[:, None].to(encoded.device), repaired_seqs, encoded)
 
                 new_experience = zip(repaired_smiles, repaired_score)
                 experience.add_experience(new_experience)
