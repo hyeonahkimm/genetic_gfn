@@ -83,7 +83,6 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
 
         step = 0
         patience = 0
-        prev_max = 0.
         prev_n_oracles = 0
         stuck_cnt = 0
 
@@ -110,21 +109,8 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
             smiles = seq_to_smiles(seqs, voc)
             if config['valid_only']:
                 smiles = sanitize(smiles)
-            # if len(smiles) == 0:
-            #     print('no valid smiles, use invalid too')
-            #     smiles = seq_to_smiles(seqs, voc)
-            #     smiles = canonicalize(smiles)
             
             score = np.array(self.oracle(smiles))
-
-            # delta_score = np.clip(score.max() - prev_max, a_min = 0, a_max = 0.5)
-            # if prev_max < score.max():
-            #     prev_max = score.max()
-            #     stuck_cnt = 0
-            #     print('NN:', score.max(), score.mean(), score.std(), len(score))
-            # else:
-            #     stuck_cnt += 1
-            # print('NN:', score.max(), score.mean(), score.std(), len(score))
 
             if self.finish:
                 print('max oracle hit')
@@ -160,15 +146,7 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
             # reinvent_loss = torch.pow((augmented_likelihood - agent_likelihood), 2)
             # print('REINVENT:', reinvent_loss.mean().item())
 
-            # forward_flow = agent_likelihood + log_z
-            # backward_flow = Variable(score).float() * config['beta']
-            # loss = torch.pow(forward_flow-backward_flow, 2).mean()
-
-
             # Then add new experience
-            # prior_likelihood = prior_likelihood.data.cpu().numpy()
-            # new_experience = zip(smiles, score, prior_likelihood)
-            
             new_experience = zip(smiles, score)
             experience.add_experience(new_experience)
 
@@ -197,16 +175,8 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                             canonicalize=config['canonicalize']
                         )
 
-                    # child_smis = list(set(child_smis))
                     child_score = np.array(self.oracle(child_smis))
-                    
-                    # high_smis, high_score = [], []
-                    # for idx, s in enumerate(score):
-                    #     if s > prev_max:
-                    #         # new_experience = zip(smis[idx], s)
-                    #         high_smis.append(smis[idx])
-                    #         high_score.append(s)
-                    
+                
                     if not config['canonicalize']:
                         new_experience = zip(child_smis, child_score, child_n_atoms)
                     else:
@@ -227,71 +197,35 @@ class REINVENT_GA_Optimizer(BaseOptimizer):
                         print('max oracle hit')
                         break
                 
-                # if config['ga_generations'] > 1:
-                #     smis, score = ga_handler.get_final_population(mating_pool)
-                # new_experience = zip(mating_pool[0], mating_pool[1])
-                # new_experience = zip(child_smis, child_score)
-                # experience.add_experience(new_experience)
-
-            
             # Experience Replay
             # First sample
             avg_loss = 0.
             if config['experience_replay'] and len(experience) > config['experience_replay']:
                 for _ in range(config['experience_loop']):
                     if config['rank_coefficient'] >= 1:
-                        # exp_seqs, exp_score = experience.quantile_uniform_sample(config['experience_replay'], 0.001)
                         exp_seqs, exp_score, _ = experience.rank_based_sample(config['experience_replay'], config['train_rank_coefficient'])
                     elif config['rank_coefficient'] > 0:
-                        exp_seqs, exp_score, exp_pb = experience.rank_based_sample(config['experience_replay'], config['rank_coefficient'])
-                        # exp_seqs, exp_score, exp_pb = experience.rank_based_sample(config['experience_replay'], config['rank_coefficient'], return_pb=~config['canonical'])
+                        exp_seqs, exp_score, _ = experience.rank_based_sample(config['experience_replay'], config['rank_coefficient'])
                     else:
                         exp_seqs, exp_score = experience.sample(config['experience_replay'])
-                    # exp_seqs, exp_smis, exp_score = experience.sample_batch(config['experience_replay']) 
-                    # tokenized = [voc.tokenize(smile) for smile in smiles]
-                    # encoded = [Variable(voc.encode(tokenized_i)) for tokenized_i in tokenized]
-                    # encoded = MolData.collate_fn(encoded)
+
                     exp_agent_likelihood, _ = Agent.likelihood(exp_seqs.long())
                     prior_agent_likelihood, _ = Prior.likelihood(exp_seqs.long())
-                    # exp_augmented_likelihood = exp_prior_likelihood + config['sigma'] * exp_score
-                    # exp_loss = torch.pow((Variable(exp_augmented_likelihood) - exp_agent_likelihood), 2)
-                    # loss = torch.cat((loss, exp_loss), 0)
-                    # agent_likelihood = torch.cat((agent_likelihood, exp_agent_likelihood), 0)
 
                     reward = torch.tensor(exp_score).cuda()
-                    if config['penalty'] == 'kl':
-                        # print((exp_agent_likelihood - prior_agent_likelihood).mean())
-                        reward -= 0.001 * (exp_agent_likelihood - prior_agent_likelihood)
-                    elif config['penalty'] == 'prior':
-                        # print(prior_agent_likelihood.mean())
-                        # print((exp_agent_likelihood - prior_agent_likelihood).mean())
+                    if config['penalty'] == 'prior':
                         reward += 0.001 * prior_agent_likelihood
 
                     exp_forward_flow = exp_agent_likelihood + log_z
                     exp_backward_flow = reward * config['beta']
-                    # if not config['canonicalize']:
-                    #     # print(exp_pb)
-                    #     exp_backward_flow += torch.tensor(np.log(1/exp_pb)).cuda()  # approximated uniform pb
                     loss = torch.pow(exp_forward_flow - exp_backward_flow, 2).mean()
 
-                    # Add regularizer that penalizes high likelihood for the entire sequence (from REINVENT)
-                    if config['penalty'] == 'REINVENT':
-                        # print(torch.nn.functional.mse_loss(exp_agent_likelihood, prior_agent_likelihood))
-                        loss_p = - (1 / exp_agent_likelihood).mean()
-                        # print('penalty:', loss_p.item())
-                        loss += 1e3 * loss_p
-                    elif config['penalty'] == 'prior_l2':
-                        loss_p = torch.nn.functional.mse_loss(exp_agent_likelihood, prior_agent_likelihood)
-                        loss += 1e-2 * loss_p
-                    elif config['penalty'] == 'prior_kl':
+                    # KL penalty
+                    if config['penalty'] == 'prior_kl':
                         loss_p = (exp_agent_likelihood - prior_agent_likelihood).mean()
                         # print(loss.item(), loss_p.item())
                         # print(loss_p.item(), 1e-2 * torch.nn.functional.mse_loss(exp_agent_likelihood, prior_agent_likelihood).item(), 1e3 * (1 / exp_agent_likelihood).mean().item())
                         loss += config['kl_coefficient']*loss_p
-                    elif config['penalty'] == 'full_kl':
-                        loss_p = torch.nn.functional.kl_div(exp_agent_likelihood, prior_agent_likelihood, log_target=True, reduction="none").sum(-1)
-                        # print(loss_p.mean().item())
-                        loss += loss_p.mean()
 
                     # print(loss.item())
                     avg_loss += loss.item()/config['experience_loop']

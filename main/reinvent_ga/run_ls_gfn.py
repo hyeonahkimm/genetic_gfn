@@ -128,7 +128,7 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
                         tokenized = voc.tokenize(canonical)
                         encoded.append(Variable(voc.encode(tokenized)))
                     except:
-                        pass
+                        encoded.append(seqs[i])
                 encoded = MolData.collate_fn(encoded)
             else:
                 encoded = seqs
@@ -136,6 +136,7 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
             ls_avg_score = score.mean() / (config['ls_iter'] + 1)
             avg_accept_ratio = 0.
             # assert False
+            # if len(encoded) > 0:
             for _ in range(config['ls_iter']):
                 # print((encoded == 53).nonzero()[:, 1], encoded.shape)
                 # partial_len = int((encoded).nonzero()[:, 1].max()//2)
@@ -153,7 +154,7 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
                             tokenized = voc.tokenize(canonical)
                             repaired_seqs.append(Variable(voc.encode(tokenized)))
                         except:
-                            pass
+                            repaired_seqs.append(seqs[i])
                     repaired_seqs = MolData.collate_fn(repaired_seqs)
 
                 repaired_score = np.array(self.oracle(repaired_smiles))
@@ -181,8 +182,8 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
 
             try:
                 wandb.log({'ls_avg_score': ls_avg_score, 
-                           'sample_avg_score': score.mean(),
-                           'accept_ratio':avg_accept_ratio})
+                        'sample_avg_score': score.mean(),
+                        'accept_ratio':avg_accept_ratio})
             except:
                 pass
             # assert False
