@@ -1,5 +1,5 @@
 learning_rate: 0.0005
-batch_size: 16
+batch_size: 4
 ls_iter: 3
 num_keep: 1024
 experience_loop: 8

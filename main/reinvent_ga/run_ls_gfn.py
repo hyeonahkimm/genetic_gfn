@@ -73,125 +73,132 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
             else:
                 old_scores = 0
             
-            # Sample from Agent
-            seqs, agent_likelihood, entropy = Agent.sample(config['batch_size'])
+            for _ in range(64 // (config['batch_size'] * (config['ls_iter']) + 1)):
+                # Sample from Agent
+                seqs, agent_likelihood, entropy = Agent.sample(config['batch_size'])
 
-            # Remove duplicates, ie only consider unique seqs
-            unique_idxs = unique(seqs)
-            seqs = seqs[unique_idxs]
-            agent_likelihood = agent_likelihood[unique_idxs]
-            entropy = entropy[unique_idxs]
+                # Remove duplicates, ie only consider unique seqs
+                unique_idxs = unique(seqs)
+                seqs = seqs[unique_idxs]
+                agent_likelihood = agent_likelihood[unique_idxs]
+                entropy = entropy[unique_idxs]
 
-            # Get prior likelihood and score
-            prior_likelihood, _ = Prior.likelihood(Variable(seqs))
-            smiles = seq_to_smiles(seqs, voc)
-            score = np.array(self.oracle(smiles))
+                # Get prior likelihood and score
+                prior_likelihood, _ = Prior.likelihood(Variable(seqs))
+                smiles = seq_to_smiles(seqs, voc)
+                score = np.array(self.oracle(smiles))
 
-            if self.finish:
-                print('max oracle hit')
-                break 
+                if self.finish:
+                    print('max oracle hit')
+                    break 
 
-            # early stopping
-            if len(self.oracle) > 1000:
-                self.sort_buffer()
-                new_scores = [item[1][0] for item in list(self.mol_buffer.items())[:100]]
-                if new_scores == old_scores:
-                    patience += 1
-                    if patience >= self.args.patience:
-                        self.log_intermediate(finish=True)
-                        print('convergence criteria met, abort ...... ')
-                        break
+                # early stopping
+                if len(self.oracle) > 1000:
+                    self.sort_buffer()
+                    new_scores = [item[1][0] for item in list(self.mol_buffer.items())[:100]]
+                    if new_scores == old_scores:
+                        patience += 1
+                        if patience >= self.args.patience:
+                            self.log_intermediate(finish=True)
+                            print('convergence criteria met, abort ...... ')
+                            break
+                    else:
+                        patience = 0
+
+                # early stopping
+                if prev_n_oracles < len(self.oracle):
+                    stuck_cnt = 0
                 else:
-                    patience = 0
+                    stuck_cnt += 1
+                    if stuck_cnt >= 10:
+                        self.log_intermediate(finish=True)
+                        print('cannot find new molecules, abort ...... ')
+                        break
+                
+                prev_n_oracles = len(self.oracle)
+                
+                new_experience = zip(smiles, score)
+                experience.add_experience(new_experience)
 
-            # early stopping
-            if prev_n_oracles < len(self.oracle):
-                stuck_cnt = 0
-            else:
-                stuck_cnt += 1
-                if stuck_cnt >= 10:
-                    self.log_intermediate(finish=True)
-                    print('cannot find new molecules, abort ...... ')
-                    break
-            
-            prev_n_oracles = len(self.oracle)
-            
-            new_experience = zip(smiles, score)
-            experience.add_experience(new_experience)
-
-            # Local Search
-            if config['canonicalize']:
-                encoded = []
-                for i, smi in enumerate(smiles):
-                    try:
-                        canonical = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
-                        tokenized = voc.tokenize(canonical)
-                        encoded.append(Variable(voc.encode(tokenized)))
-                    except:
-                        encoded.append(seqs[i])
-                encoded = MolData.collate_fn(encoded)
-            else:
-                encoded = seqs
-            
-            ls_avg_score = score.mean() / (config['ls_iter'] + 1)
-            avg_accept_ratio = 0.
-            # assert False
-            # if len(encoded) > 0:
-            for _ in range(config['ls_iter']):
-                # print((encoded == 53).nonzero()[:, 1], encoded.shape)
-                # partial_len = int((encoded).nonzero()[:, 1].max()//2)
-                partial_len = ((encoded == 53).nonzero()[:, 1].min(dim=0)[0]*0.7).long()
-                # print(encoded.shape, partial_len, (encoded == 0).nonzero()[:, 1].min(dim=0)[0])
-                destroyed_seqs = encoded[:, :partial_len].long()
-                repaired_seqs, _, _ = Agent.sample_start_from(destroyed_seqs)
-                repaired_smiles = seq_to_smiles(repaired_seqs, voc)
-
+                # Local Search
                 if config['canonicalize']:
-                    repaired_seqs = []
+                    encoded = []
                     for i, smi in enumerate(smiles):
                         try:
                             canonical = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
                             tokenized = voc.tokenize(canonical)
-                            repaired_seqs.append(Variable(voc.encode(tokenized)))
+                            encoded.append(Variable(voc.encode(tokenized)))
                         except:
-                            repaired_seqs.append(seqs[i])
-                    repaired_seqs = MolData.collate_fn(repaired_seqs)
-
-                repaired_score = np.array(self.oracle(repaired_smiles))
-                ls_avg_score += repaired_score.mean()/(config['ls_iter'] + 1)
-            
-                try:
-                    accept_mask = repaired_score > score  # size mismathes (rarely)
-                except:
-                    accept_mask = torch.tensor([False] * len(repaired_score)).to(encoded.device)
-
-                accept_mask = torch.tensor(accept_mask).to(encoded.device)
-                avg_accept_ratio += accept_mask.sum() / config['ls_iter']
-
-                if repaired_seqs.shape[1] < encoded.shape[1]:
-                    repaired_seqs = torch.cat([repaired_seqs, torch.zeros(encoded.shape[0], encoded.shape[1] - repaired_seqs.shape[1]).long().to(encoded.device)], dim=1)
+                            encoded.append(seqs[i])
+                    encoded = MolData.collate_fn(encoded)
                 else:
-                    encoded = torch.cat([encoded, torch.zeros(encoded.shape[0], repaired_seqs.shape[1] - encoded.shape[1]).long().to(encoded.device)], dim=1)
+                    encoded = seqs
+                
+                ls_avg_score = score.mean() / (config['ls_iter'] + 1)
+                avg_accept_ratio = 0.
+                # assert False
+                # if len(encoded) > 0:
+                for _ in range(config['ls_iter']):
+                    # print((encoded == 53).nonzero()[:, 1], encoded.shape)
+                    # partial_len = int((encoded).nonzero()[:, 1].max()//2)
+                    partial_len = ((encoded == 53).nonzero()[:, 1].min(dim=0)[0]*0.5).long()
+                    # print(encoded.shape, partial_len, (encoded == 0).nonzero()[:, 1].min(dim=0)[0])
+                    destroyed_seqs = encoded[:, :partial_len].long()
+                    # print('seq:', seqs[:2])
+                    # print('encoded:', encoded[:2])
+                    # print(destroyed_seqs[:2])
+                    repaired_seqs, _, _ = Agent.sample_start_from(destroyed_seqs)
+                    repaired_smiles = seq_to_smiles(repaired_seqs, voc)
 
-                # print(torch.tensor(accept_mask).sum())
-                encoded = torch.where(accept_mask[:, None], repaired_seqs, encoded)
-                # encoded_score = torch.where(torch.tensor(accept_mask)[:, None].to(encoded.device), repaired_seqs, encoded)
+                    if config['canonicalize']:
+                        repaired_seqs = []
+                        for i, smi in enumerate(smiles):
+                            try:
+                                canonical = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
+                                tokenized = voc.tokenize(canonical)
+                                repaired_seqs.append(Variable(voc.encode(tokenized)))
+                            except:
+                                repaired_seqs.append(seqs[i])
+                        repaired_seqs = MolData.collate_fn(repaired_seqs)
 
-                new_experience = zip(repaired_smiles, repaired_score)
-                experience.add_experience(new_experience)
+                    repaired_score = np.array(self.oracle(repaired_smiles))
+                    ls_avg_score += repaired_score.mean()/(config['ls_iter'] + 1)
+                
+                    try:
+                        accept_mask = repaired_score > score  # size mismathes (rarely)
+                    except:
+                        accept_mask = torch.tensor([False] * len(repaired_score)).to(encoded.device)
 
-            try:
-                wandb.log({'ls_avg_score': ls_avg_score, 
-                        'sample_avg_score': score.mean(),
-                        'accept_ratio':avg_accept_ratio})
-            except:
-                pass
-            # assert False
+                    accept_mask = torch.tensor(accept_mask).to(encoded.device)
+                    avg_accept_ratio += accept_mask.sum() / config['ls_iter']
 
-            if self.finish:
-                print('max oracle hit')
-                break
+                    if repaired_seqs.shape[1] < encoded.shape[1]:
+                        repaired_seqs = torch.cat([repaired_seqs, torch.zeros(encoded.shape[0], encoded.shape[1] - repaired_seqs.shape[1]).long().to(encoded.device)], dim=1)
+                    else:
+                        encoded = torch.cat([encoded, torch.zeros(encoded.shape[0], repaired_seqs.shape[1] - encoded.shape[1]).long().to(encoded.device)], dim=1)
+
+                    # print(torch.tensor(accept_mask).sum())
+                    encoded = torch.where(accept_mask[:, None], repaired_seqs, encoded)
+                    # encoded_score = torch.where(torch.tensor(accept_mask)[:, None].to(encoded.device), repaired_seqs, encoded)
+
+                    new_experience = zip(repaired_smiles, repaired_score)
+                    experience.add_experience(new_experience)
+
+                try:
+                    wandb.log({'ls_avg_score': ls_avg_score, 
+                            'sample_avg_score': score.mean(),
+                            'accept_ratio':avg_accept_ratio})
+                except:
+                    pass
+                # assert False
+
+                if self.finish:
+                    print('max oracle hit')
+                    break
             
+            if self.finish:
+                break 
+                
             
             # Experience Replay
             # First sample

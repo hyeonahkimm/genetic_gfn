@@ -11,7 +11,7 @@ offspring_size: 0
 ga_generations: 0
 rank_coefficient: 0.01
 num_jobs: 1
-penalty: kl
+penalty: prior_kl
 blended_ga: False
 ga_sample_from: mol_buffer
 low_score_ratio: 0.
