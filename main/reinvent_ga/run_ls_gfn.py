@@ -92,7 +92,6 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
                     print('max oracle hit')
                     break 
 
-                
                 prev_n_oracles = len(self.oracle)
                 
                 new_experience = zip(smiles, score)
@@ -103,7 +102,7 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
                     encoded = []
                     for i, smi in enumerate(smiles):
                         try:
-                            canonical = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
+                            canonical = Chem.MolToSmiles(Chem.MolFromSmiles(smi), doRandom=True)
                             tokenized = voc.tokenize(canonical)
                             encoded.append(Variable(voc.encode(tokenized)))
                         except:
@@ -115,11 +114,14 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
                 ls_avg_score = score.mean() / (config['ls_iter'] + 1)
                 avg_accept_ratio = 0.
                 # assert False
-                # if len(encoded) > 0:
                 for _ in range(config['ls_iter']):
+                    if len(encoded) == 0: break
                     # print((encoded == 53).nonzero()[:, 1], encoded.shape)
                     # partial_len = int((encoded).nonzero()[:, 1].max()//2)
-                    partial_len = ((encoded == 53).nonzero()[:, 1].min(dim=0)[0]*0.5).long()
+                    try:
+                        partial_len = ((encoded == 53).nonzero()[:, 1].min(dim=0)[0]*0.5).long()
+                    except:
+                        partial_len = (encoded.shape[1]//2).long()
                     # print(encoded.shape, partial_len, (encoded == 0).nonzero()[:, 1].min(dim=0)[0])
                     destroyed_seqs = encoded[:, :partial_len].long()
                     # print('seq:', seqs[:2])
@@ -195,7 +197,7 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
                 stuck_cnt = 0
             else:
                 stuck_cnt += 1
-                if stuck_cnt >= 10:
+                if stuck_cnt >= 100:
                     self.log_intermediate(finish=True)
                     print('cannot find new molecules, abort ...... ')
                     break
