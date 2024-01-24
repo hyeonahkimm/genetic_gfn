@@ -121,7 +121,7 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
                     try:
                         partial_len = ((encoded == 53).nonzero()[:, 1].min(dim=0)[0]*0.5).long()
                     except:
-                        partial_len = (encoded.shape[1]//2).long()
+                        partial_len = (encoded.shape[1]//2)
                     # print(encoded.shape, partial_len, (encoded == 0).nonzero()[:, 1].min(dim=0)[0])
                     destroyed_seqs = encoded[:, :partial_len].long()
                     # print('seq:', seqs[:2])
