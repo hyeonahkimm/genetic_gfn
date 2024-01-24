@@ -92,28 +92,6 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
                     print('max oracle hit')
                     break 
 
-                # early stopping
-                if len(self.oracle) > 1000:
-                    self.sort_buffer()
-                    new_scores = [item[1][0] for item in list(self.mol_buffer.items())[:100]]
-                    if new_scores == old_scores:
-                        patience += 1
-                        if patience >= self.args.patience:
-                            self.log_intermediate(finish=True)
-                            print('convergence criteria met, abort ...... ')
-                            break
-                    else:
-                        patience = 0
-
-                # early stopping
-                if prev_n_oracles < len(self.oracle):
-                    stuck_cnt = 0
-                else:
-                    stuck_cnt += 1
-                    if stuck_cnt >= 10:
-                        self.log_intermediate(finish=True)
-                        print('cannot find new molecules, abort ...... ')
-                        break
                 
                 prev_n_oracles = len(self.oracle)
                 
@@ -198,7 +176,29 @@ class REINVENT_LS_GFN_Optimizer(BaseOptimizer):
             
             if self.finish:
                 break 
-                
+            
+            # early stopping
+            if len(self.oracle) > 1000:
+                self.sort_buffer()
+                new_scores = [item[1][0] for item in list(self.mol_buffer.items())[:100]]
+                if new_scores == old_scores:
+                    patience += 1
+                    if patience >= self.args.patience:
+                        self.log_intermediate(finish=True)
+                        print('convergence criteria met, abort ...... ')
+                        break
+                else:
+                    patience = 0
+
+            # early stopping
+            if prev_n_oracles < len(self.oracle):
+                stuck_cnt = 0
+            else:
+                stuck_cnt += 1
+                if stuck_cnt >= 10:
+                    self.log_intermediate(finish=True)
+                    print('cannot find new molecules, abort ...... ')
+                    break
             
             # Experience Replay
             # First sample
