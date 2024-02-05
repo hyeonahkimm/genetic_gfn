@@ -16,14 +16,14 @@ param_dir    = 'hb_fp_2_4096_256'
 ncpu         = 1
 
 # load the purchasable building block embeddings
-bb_emb = np.load('/pool001/whgao/data/synth_net/st_hb/enamine_us_emb_fp_256.npy')
+bb_emb = np.load('data/synth_net/st_hb/enamine_us_emb_fp_256.npy')
 
 # define path to the reaction templates and purchasable building blocks
-path_to_reaction_file   = f'/pool001/whgao/data/synth_net/st_{rxn_template}/reactions_{rxn_template}.json.gz'
-path_to_building_blocks = f'/pool001/whgao/data/synth_net/st_{rxn_template}/enamine_us_matched.csv.gz'
+path_to_reaction_file   = f'data/synth_net/st_{rxn_template}/reactions_{rxn_template}.json.gz'
+path_to_building_blocks = f'data/synth_net/st_{rxn_template}/enamine_us_matched.csv.gz'
 
 # define paths to pretrained modules
-param_path  = f'/home/whgao/synth_net/synth_net/params/{param_dir}/'
+param_path  = f'synth_net/synth_net/params/{param_dir}/'
 path_to_act = f'{param_path}act.ckpt'
 path_to_rt1 = f'{param_path}rt1.ckpt'
 path_to_rxn = f'{param_path}rxn.ckpt'
