@@ -1,7 +1,9 @@
 """ Main code for running GAs. """
 from __future__ import annotations
 
+from tqdm import tqdm
 import logging
+logging.basicConfig(level=logging.INFO)
 import random
 from dataclasses import dataclass
 from pprint import pformat
@@ -101,7 +103,7 @@ def run_ga_maximization(
 
     # Run GA
     gen_info: list[dict[str, Any]] = []
-    for generation in range(max_generations):
+    for generation in tqdm(range(max_generations)):
         logger.info(f"Start generation {generation}")
 
         # Separate out into SMILES and scores
@@ -144,9 +146,16 @@ def run_ga_maximization(
             size=len(population_scores),
             num_func_eval=len(scoring_func.cache) - start_cache_size,
         )
-        logger.info("End of generation. Stats:\n" + pformat(gen_stats_dict))
+        logger.debug("End of generation. Stats:\n" + pformat(gen_stats_dict))
         gen_info.append(gen_stats_dict)
         del population_scores, population_smiles
+
+        if scoring_func._f.finish:
+            logger.info('max oracle hit, abort ...... ')
+            break
+
+    if not scoring_func._f.finish:
+        scoring_func._f.log_intermediate(finish=True)
 
     # ============================================================
     # 3: Create return object

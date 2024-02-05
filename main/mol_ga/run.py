@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import random
 import joblib
 
 from main.mol_ga.mol_ga import default_ga
 from main.mol_ga.mol_ga.mol_libraries import random_zinc
 from main.optimizer import BaseOptimizer
-
 
 
 class MolGAOptimizer(BaseOptimizer):
@@ -17,17 +17,18 @@ class MolGAOptimizer(BaseOptimizer):
     def _optimize(self, oracle, config):
         self.oracle.assign_evaluator(oracle)
 
+        rng = random.Random(self.seed)
         kwargs = dict(
-            starting_population_smiles=random_zinc(500),
+            starting_population_smiles=random_zinc(config['starting_population_size'], rng),
             scoring_function=self.oracle,
             max_generations=config['max_generations'],
             offspring_size=config['offspring_size'],
-            population_size=50,
-            std_num_atoms = 1e2
+            population_size=config['population_size'],
+            rng=rng,
         )
 
         if config['parallel']:
-            with joblib.Parallel(n_jobs=-1) as parallel:
+            with joblib.Parallel(n_jobs=config['ncpu']) as parallel:
                 output = default_ga(**kwargs, parallel=parallel)
         else:
             output = default_ga(**kwargs, parallel=None)

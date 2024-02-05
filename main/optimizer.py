@@ -327,7 +327,7 @@ class BaseOptimizer:
         seeds = [0, 1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97]
         seeds = seeds[:num_runs]
         hparam_space["name"] = hparam_space["name"]
-        
+
         def _func():
             with wandb.init(config=hparam_default, allow_val_change=True) as run:
                 avg_auc = 0
@@ -338,17 +338,17 @@ class BaseOptimizer:
                         torch.manual_seed(seed)
                         torch.cuda.manual_seed_all(seed)
                         random.seed(seed)
+                        self.seed = seed
                         config = wandb.config
                         self._optimize(oracle, config)
                         auc_top10s.append(top_auc(self.oracle.mol_buffer, 10, True, self.oracle.freq_log, self.oracle.max_oracle_calls))
                         self.reset()
                     avg_auc += np.mean(auc_top10s)
                 wandb.log({"avg_auc": avg_auc})
-            
-        sweep_id = wandb.sweep(hparam_space)
-        wandb.agent(sweep_id, function=_func, count=count, project='uncategorized')
-        # wandb.agent(sweep_id, function=_func, count=count)
-        
+
+        sweep_id = wandb.sweep(hparam_space, project=project)
+        wandb.agent(sweep_id, function=_func, count=count)
+
     def optimize(self, oracle, config, seed=0, project="test"):
         # run = wandb.init(project=project, config=config, reinit=True, entity="mol_opt")
         if self.args.wandb != 'disabled':
