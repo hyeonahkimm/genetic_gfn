@@ -1,8 +1,0 @@
-learning_rate: 0.0005
-batch_size: 64
-sigma: 500
-buffer_size: 100
-experience_replay: 32
-distil_every: 0
-distil_coefficient: 0.0
-symmetric_distil: True
