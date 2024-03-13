@@ -20,7 +20,7 @@ In addition, we implemented `Mol GA` and `GEGL` by adopting the original impleme
 
 Clone project and create environment with conda:
 ```
-conda create -n genetic python==3.8
+conda create -n genetic python==3.7
 conda activate genetic
 
 conda install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.3 -c pytorch
@@ -28,7 +28,7 @@ conda install -c rdkit rdkit
 pip install -r requirements.txt
 ```
 
-**Note**: we highly recommend using Python 3.8, and PyTorch 1.12.1. Importantly, we use PyTDC 0.4.0 instead of 0.3.6.
+**Note**: we highly recommend using Python 3.7, and PyTorch 1.12.1. Importantly, we use PyTDC 0.4.0 instead of 0.3.6.
 
 For other baseline, please see `README_PMO.md`; we recommend using Python 3.8 for `GP BO` and `requirement_gpbo.txt`.
 
