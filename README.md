@@ -31,6 +31,7 @@ pip install -r requirements.txt
 **Note**: we highly recommend using Python 3.7, and PyTorch 1.12.1. Importantly, we use PyTDC 0.4.0 instead of 0.3.6.
 
 For other baseline, please see `README_PMO.md`; we recommend using Python 3.8 for `GP BO` and `requirement_gpbo.txt`.
+When you use Python 3.8, you can install rdkit with `pip install rdkit-pypi`.
 
 
 ## Usage
