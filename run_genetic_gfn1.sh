@@ -6,11 +6,11 @@ oracle_array=('jnk3' 'drd2' 'qed' 'gsk3b' 'celecoxib_rediscovery' 'troglitazone_
         'fexofenadine_mpo' 'ranolazine_mpo' 'perindopril_mpo' 'amlodipine_mpo' \
         'sitagliptin_mpo' 'zaleplon_mpo' 'valsartan_smarts' 'deco_hop' 'scaffold_hop')
 
-for seed in 2 3 4 1 0
+for seed in 1 2
 do
 for oralce in "${oracle_array[@]}"
 do
 # echo $oralce
-CUDA_VISIBLE_DEVICES=0 python run.py genetic_gfn --task simple --wandb online --oracle $oralce --seed $seed
+CUDA_VISIBLE_DEVICES=1 python run.py genetic_gfn --task simple --wandb online --oracle $oralce --seed $seed --run_name k0_5 --config_default 'hparams_k.yaml'
 done
 done
