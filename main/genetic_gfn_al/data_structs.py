@@ -108,6 +108,8 @@ class MolData(Dataset):
 
     @classmethod
     def collate_fn(cls, arr):
+        if len([seq.size(0) for seq in arr]) == 0:
+            import pdb; pdb.set_trace()
         """Function to take a list of encoded sequences and turn them into a batch"""
         max_length = max([seq.size(0) for seq in arr])
         collated_arr = Variable(torch.zeros(len(arr), max_length))

@@ -125,6 +125,8 @@ class GeneticOperatorHandler:
                     n_atoms.append(m.GetNumAtoms())
             except:
                 pass
+        # if len(smis) == 0:
+        #     import pdb; pdb.set_trace()
 
         gc.collect()
 

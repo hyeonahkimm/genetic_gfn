@@ -142,26 +142,26 @@ class Genetic_GFN_AL_Optimizer(BaseOptimizer):
         proxy_dataset.add_experience(new_experience)
         print(len(proxy_dataset), 'train mols')
 
-        # if config['population_size'] and len(proxy_dataset) > config['population_size']:
-        #     # self.oracle.sort_buffer()
-        #     pop_smis, pop_scores = proxy_dataset.get_elems()
+        if config['population_size'] and len(proxy_dataset) > config['population_size']:
+            # self.oracle.sort_buffer()
+            pop_smis, pop_scores = proxy_dataset.get_elems()
 
-        #     mating_pool = (pop_smis[:config['num_keep']], pop_scores[:config['num_keep']])
+            mating_pool = (pop_smis[:config['num_keep']], pop_scores[:config['num_keep']])
 
-        #     for g in range(config['ga_generations']):
-        #         child_smis, child_n_atoms, pop_smis, pop_scores = ga_handler.query(
-        #                 query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, 
-        #                 rank_coefficient=config['rank_coefficient'], return_dist=False
-        #             )
+            for g in range(config['ga_generations']):
+                child_smis, child_n_atoms, pop_smis, pop_scores = ga_handler.query(
+                        query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, 
+                        rank_coefficient=config['rank_coefficient'], return_dist=False
+                    )
                 
-        #         # tot_ga_results = pd.concat([tot_ga_results, pd.DataFrame(ga_results)])
+                # tot_ga_results = pd.concat([tot_ga_results, pd.DataFrame(ga_results)])
 
-        #         child_score = np.array(self.oracle(child_smis))
+                child_score = np.array(self.oracle(child_smis))
 
-        #         new_experience = zip(child_smis, child_score)
-        #         proxy_dataset.add_experience(new_experience)
+                new_experience = zip(child_smis, child_score)
+                proxy_dataset.add_experience(new_experience)
 
-        #         mating_pool = (pop_smis+child_smis, pop_scores+child_score.tolist())
+                mating_pool = (pop_smis+child_smis, pop_scores+child_score.tolist())
 
         proxy.model.train()
         proxy.fit(proxy_dataset)
@@ -211,9 +211,9 @@ class Genetic_GFN_AL_Optimizer(BaseOptimizer):
                     mating_pool = (pop_smis[:config['num_keep']], pop_scores[:config['num_keep']])
 
                     for g in range(config['ga_generations']):
-                        child_smis, child_n_atoms, pop_smis, pop_scores = ga_handler.query(
+                        child_smis, child_n_atoms, pop_smis, pop_scores, ga_results = ga_handler.query(
                                 query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, 
-                                rank_coefficient=config['rank_coefficient'], return_dist=False
+                                rank_coefficient=config['rank_coefficient'], return_dist=True
                             )
                         
                         # tot_ga_results = pd.concat([tot_ga_results, pd.DataFrame(ga_results)])
@@ -226,12 +226,14 @@ class Genetic_GFN_AL_Optimizer(BaseOptimizer):
                                 encoded.append(Variable(voc.encode(tokenized)))
                             except:
                                 pass
-                        encoded = MolData.collate_fn(encoded)
+                            
+                        if len(encoded) > 0:
+                            encoded = MolData.collate_fn(encoded)
 
-                        child_score = proxy(encoded).view(-1).cpu().detach().numpy()
-                    
-                        new_experience = zip(child_smis, child_score)
-                        experience.add_experience(new_experience)
+                            child_score = proxy(encoded).view(-1).cpu().detach().numpy()
+                        
+                            new_experience = zip(child_smis, child_score)
+                            experience.add_experience(new_experience)
 
                         mating_pool = (pop_smis+child_smis, pop_scores+child_score.tolist())
 
@@ -296,30 +298,30 @@ class Genetic_GFN_AL_Optimizer(BaseOptimizer):
                 print('max oracle hit, abort ...... ')
                 break 
 
-            # if config['population_size'] and len(proxy_dataset) > config['population_size']:
-            #     # self.oracle.sort_buffer()
-            #     pop_smis, pop_scores = proxy_dataset.get_elems()
+            if config['population_size'] and len(proxy_dataset) > config['population_size']:
+                # self.oracle.sort_buffer()
+                pop_smis, pop_scores = proxy_dataset.get_elems()
 
-            #     mating_pool = (pop_smis[:config['num_keep']], pop_scores[:config['num_keep']])
+                mating_pool = (pop_smis[:config['num_keep']], pop_scores[:config['num_keep']])
 
-            #     for g in range(config['ga_generations']):
-            #         child_smis, child_n_atoms, pop_smis, pop_scores = ga_handler.query(
-            #                 query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, 
-            #                 rank_coefficient=config['rank_coefficient'], return_dist=False
-            #             )
+                for g in range(config['ga_generations']):
+                    child_smis, child_n_atoms, pop_smis, pop_scores = ga_handler.query(
+                            query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, 
+                            rank_coefficient=config['rank_coefficient'], return_dist=False
+                        )
                     
-            #         # tot_ga_results = pd.concat([tot_ga_results, pd.DataFrame(ga_results)])
+                    # tot_ga_results = pd.concat([tot_ga_results, pd.DataFrame(ga_results)])
 
-            #         child_score = np.array(self.oracle(child_smis))
+                    child_score = np.array(self.oracle(child_smis))
 
-            #         new_experience = zip(child_smis, child_score)
-            #         proxy_dataset.add_experience(new_experience)
+                    new_experience = zip(child_smis, child_score)
+                    proxy_dataset.add_experience(new_experience)
 
-            #         mating_pool = (pop_smis+child_smis, pop_scores+child_score.tolist())
+                    mating_pool = (pop_smis+child_smis, pop_scores+child_score.tolist())
             
-            # if self.finish:
-            #     print('max oracle hit, abort ...... ')
-            #     break 
+            if self.finish:
+                print('max oracle hit, abort ...... ')
+                break 
             
             proxy.model.train()
             proxy.update(proxy_dataset)
