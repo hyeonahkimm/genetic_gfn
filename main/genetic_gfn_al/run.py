@@ -22,8 +22,8 @@ from tqdm import tqdm
 from joblib import Parallel
 from graph_ga_expert import GeneticOperatorHandler
 
-from proxy.proxy import get_proxy_model
-from proxy.acquisition_fn import get_acq_fn
+from lib.proxy import get_proxy_model
+from lib.acquisition_fn import get_acq_fn
 
 
 # proxy contruction code following GFN-AL
