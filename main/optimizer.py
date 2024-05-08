@@ -9,6 +9,8 @@ import tdc
 from tdc.generation import MolGen
 import wandb
 from main.utils.chem import *
+# from polyleven import levenshtein
+# import itertools
 
 
 class Objdict(dict):
@@ -46,6 +48,14 @@ def top_auc(buffer, top_n, finish, freq_log, max_oracle_calls):
     if finish and len(buffer) < max_oracle_calls:
         sum += (max_oracle_calls - len(buffer)) * top_n_now
     return sum / max_oracle_calls
+
+
+# Diversity measurement code following GFN-AL
+# def mean_pairwise_distances(seqs):
+#     dists = []
+#     for pair in itertools.combinations(seqs, 2):
+#         dists.append(levenshtein(*pair))
+#     return np.mean(dists)
 
 
 class Oracle:
@@ -352,7 +362,7 @@ class BaseOptimizer:
     def optimize(self, oracle, config, seed=0, project="test"):
         # run = wandb.init(project=project, config=config, reinit=True, entity="mol_opt")
         if self.args.wandb != 'disabled':
-            project = 'pmo' if self.args.method.startswith('reinvent_ga') else 'pmo_baselines'
+            project = 'pmo' if self.args.method.startswith('genetic_gfn') else 'pmo_baselines'
             run = wandb.init(project=project, group=oracle.name, config=config, reinit=True)
             wandb.config.oracle = oracle.name
             wandb.config.method = self.args.method

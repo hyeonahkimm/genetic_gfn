@@ -139,6 +139,9 @@ class Experience(object):
             self.memory = self.memory[:self.max_size]
             # print("\nBest score in memory: {:.2f}".format(self.memory[0][1]))
 
+    def get_elems(self):
+        return tuple(map(list, zip(*[(smi, score) for (smi, score, _) in self.memory])))
+
     def sample(self, n):
         """Sample a batch size n of experience"""
         if len(self.memory)<n:

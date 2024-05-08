@@ -9,7 +9,13 @@ import numpy as np
 from joblib import delayed
 from rdkit import Chem, rdBase
 from rdkit.Chem.rdchem import Mol
+from polyleven import levenshtein
+from tdc import Evaluator
 rdBase.DisableLog('rdApp.error')
+
+import pandas as pd
+import os
+import time
 
 import main.genetic_gfn.genetic_operator.crossover as co
 import main.genetic_gfn.genetic_operator.mutate as mu
@@ -65,19 +71,24 @@ def reproduce(mating_pool, mutation_rate):
     new_child = co.crossover(parent_a, parent_b)
     if new_child is not None:
         new_child = mu.mutate(new_child, mutation_rate)
-    return new_child
+    return new_child, parent_a, parent_b
 
 
 class GeneticOperatorHandler:
     def __init__(self, mutation_rate: float=0.067, population_size=200):
         self.mutation_rate = mutation_rate
         self.population_size = population_size
+        self.mol_distance_func = Evaluator(name = 'Diversity')
+        self.mol_novelty_func = Evaluator(name = 'Novelty')
+    
+    def smiles_distance_func(self, smi_a, smi_b):
+        return levenshtein(smi_a, smi_b) / max(len(smi_a), len(smi_b))
 
     # def get_final_population(self, mating_pool, rank_coefficient=0.):
     #     new_mating_pool, new_mating_scores, _, _ = make_mating_pool(mating_pool[0], mating_pool[1], self.population_size, rank_coefficient)
     #     return (new_mating_pool, new_mating_scores)
 
-    def query(self, query_size, mating_pool, pool, rank_coefficient=0.01, mutation_rate=None):
+    def query(self, query_size, mating_pool, pool, rank_coefficient=0.01, mutation_rate=None, return_dist=False):
         # print(mating_pool)
         if mutation_rate is None:
             mutation_rate = self.mutation_rate
@@ -86,15 +97,29 @@ class GeneticOperatorHandler:
 
         cross_mating_pool, cross_mating_scores = make_mating_pool(population_mol, population_scores, self.population_size, rank_coefficient)
 
-        offspring_mol = pool(delayed(reproduce)(cross_mating_pool, mutation_rate) for _ in range(query_size))
+        # offspring_mol = pool(delayed(reproduce)(cross_mating_pool, mutation_rate) for _ in range(query_size))
+        offspring_mol, parents_a, parents_b = zip(*[reproduce(cross_mating_pool, mutation_rate) for _ in range(query_size)])
         new_mating_pool = cross_mating_pool
         new_mating_scores = cross_mating_scores
 
         smis, n_atoms = [], []
-        for m in offspring_mol:
+        # rst = {}
+        smiles_distances, smiles_novelty = [], []
+        mol_distances, mol_novelty = [], []
+        parents_smis, chileren_smis = [], []
+        for m, a, b in zip(offspring_mol, parents_a, parents_b):
             try:
                 # smis.append(Chem.MolToSmiles(m))
                 smi = Chem.MolToSmiles(m)
+                if return_dist:
+                    smi_a = Chem.MolToSmiles(a)
+                    smi_b = Chem.MolToSmiles(b)
+                    chileren_smis.append(smi)
+                    parents_smis.append((smi_a, smi_b))
+                    smiles_distances.append((levenshtein(smi_a, smi) + levenshtein(smi_b, smi)) / 2)
+                    smiles_novelty.append(min(levenshtein(smi_a, smi), levenshtein(smi_b, smi)))
+                    mol_distances.append((self.mol_distance_func([smi_a, smi]) + self.mol_distance_func([smi_b, smi]))/2)
+                    mol_novelty.append(self.mol_novelty_func([smi], [smi_a, smi_b]))
                 if smi not in smis:  # unique
                     smis.append(smi)
                     n_atoms.append(m.GetNumAtoms())
@@ -111,5 +136,12 @@ class GeneticOperatorHandler:
                 pop_valid_scores.append(s)
             except:
                 pass
+
+        if return_dist:
+            # dists = {'smiles': np.mean(smiles_distances), 'mol': np.mean(mol_distances)}
+            results = {'children': chileren_smis, 'parents': parents_smis, 'smiles_dist': smiles_distances, 'mol_dist': mol_distances, 'smiles_novelty': smiles_novelty, 'mol_novelty': mol_novelty}
+            # save_dir = './ga_results/run_jnk3_' + time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime())
+            # results.to_csv('./main/genetic_gfn/ga_results/run_jnk3_results' + time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime()) + '.csv', index=False)
+            return smis, n_atoms, pop_valid_smis, pop_valid_scores, results
         
         return smis, n_atoms, pop_valid_smis, pop_valid_scores

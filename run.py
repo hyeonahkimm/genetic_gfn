@@ -122,6 +122,8 @@ def main():
         from main.genetic_gfn.run import Genetic_GFN_Optimizer as Optimizer
     elif args.method == "genetic_gfn_selfies":
         from main.genetic_gfn_selfies.run import Genetic_GFN_SELFIES_Optimizer as Optimizer
+    elif args.method == "genetic_gfn_al":
+        from main.genetic_gfn_al.run import Genetic_GFN_AL_Optimizer as Optimizer
     else:
         raise ValueError("Unrecognized method name.")
 

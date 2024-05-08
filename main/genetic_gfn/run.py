@@ -11,10 +11,35 @@ from data_structs import Vocabulary, Experience, MolData
 from priority_queue import MaxRewardPriorityQueue
 import torch
 from rdkit import Chem
+from tdc import Evaluator
+from polyleven import levenshtein
+
+import itertools
+import pickle
+import pandas as pd
 
 from joblib import Parallel
 from graph_ga_expert import GeneticOperatorHandler
 # from smiles_ga_expert import GeneticOperatorHandler as SmilesGA
+
+
+def diversity(smiles):
+    # dist = [levenshtein(*pair) for pair in itertools.combinations(smiles, 2)]
+    dist, normalized = [], []
+    for pair in itertools.combinations(smiles, 2):
+        dist.append(levenshtein(*pair))
+        normalized.append(levenshtein(*pair)/max(len(pair[0]), len(pair[1])))
+    evaluator = Evaluator(name = 'Diversity')
+    mol_div = evaluator(smiles)
+    return np.mean(normalized), np.mean(dist), mol_div
+
+
+def novelty(new_smiles, ref_smiles):
+    smiles_novelty = [min([levenshtein(d, od) for od in ref_smiles]) for d in new_smiles]
+    smiles_norm_novelty = [min([levenshtein(d, od) / max(len(d), len(od)) for od in ref_smiles]) for d in new_smiles]
+    evaluator = Evaluator(name = 'Novelty')
+    mol_novelty = evaluator(new_smiles, ref_smiles)
+    return np.mean(smiles_norm_novelty), np.mean(smiles_novelty), mol_novelty
 
 
 def sanitize(smiles):
@@ -82,6 +107,16 @@ class Genetic_GFN_Optimizer(BaseOptimizer):
         prev_n_oracles = 0
         stuck_cnt = 0
 
+        policy_smiles_norm_diversity, policy_smiles_diversity, policy_mol_diversity = [], [], []
+        policy_smiles_norm_novelty, policy_smiles_novelty, policy_mol_novelty = [], [], []
+        ga_smiles_norm_novelty, ga_smiles_novelty, ga_mol_novelty = [], [], []
+        policy_ga_smiles_norm_novelty, policy_ga_smiles_novelty, policy_ga_mol_novelty = [], [], []
+        parents_children_smiles_distances, parents_children_mol_distances = [], []
+        best_scores = []
+
+        tot_ga_results = pd.DataFrame({'children': [], 'parents': [], 'smiles_dist': [], 'mol_dist': []})
+
+        prev_best = 0.
         while True:
 
             if len(self.oracle) > 100:
@@ -141,10 +176,24 @@ class Genetic_GFN_Optimizer(BaseOptimizer):
             # reinvent_loss = torch.pow((augmented_likelihood - agent_likelihood), 2)
             # print('REINVENT:', reinvent_loss.mean().item())
 
+            # policy novelty
+            if step > 0:
+                # import pdb; pdb.set_trace()
+                smiles_norm_novelty, smiles_novelty, mol_novelty = novelty(smiles, experience.get_elems()[0])
+                policy_smiles_norm_novelty.append(smiles_norm_novelty)
+                policy_smiles_novelty.append(smiles_novelty)
+                policy_mol_novelty.append(mol_novelty)
+                smiles_norm_div, smiles_div, mol_div = diversity(smiles)
+                policy_smiles_norm_diversity.append(smiles_norm_div)
+                policy_smiles_diversity.append(smiles_div)
+                policy_mol_diversity.append(mol_div)
+            policy_best = np.max(score)
+
             # Then add new experience
             new_experience = zip(smiles, score)
             experience.add_experience(new_experience)
 
+            ga_best = 0.
             if config['population_size'] and len(self.oracle) > config['population_size']:
                 self.oracle.sort_buffer()
                 pop_smis, pop_scores = tuple(map(list, zip(*[(smi, elem[0]) for (smi, elem) in self.oracle.mol_buffer.items()])))
@@ -152,12 +201,28 @@ class Genetic_GFN_Optimizer(BaseOptimizer):
                 mating_pool = (pop_smis[:config['num_keep']], pop_scores[:config['num_keep']])
 
                 for g in range(config['ga_generations']):
-                    child_smis, child_n_atoms, pop_smis, pop_scores = ga_handler.query(
+                    child_smis, child_n_atoms, pop_smis, pop_scores, ga_results = ga_handler.query(
                             query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, 
-                            rank_coefficient=config['rank_coefficient'], 
+                            rank_coefficient=config['rank_coefficient'], return_dist=True
                         )
+                    
+                    tot_ga_results = pd.concat([tot_ga_results, pd.DataFrame(ga_results)])
+
+                    # policy novelty
+                    smiles_norm_novelty, smiles_novelty, mol_novelty = novelty(child_smis, experience.get_elems()[0])
+                    ga_smiles_norm_novelty.append(smiles_norm_novelty)
+                    ga_smiles_novelty.append(smiles_novelty)
+                    ga_mol_novelty.append(mol_novelty)
+                    smiles_norm_novelty, smiles_novelty, mol_novelty = novelty(child_smis, smiles)
+                    policy_ga_smiles_norm_novelty.append(smiles_norm_novelty)
+                    policy_ga_smiles_novelty.append(smiles_novelty)
+                    policy_ga_mol_novelty.append(mol_novelty)
+                    # parents_children_smiles_distances.append(np.mean(ga_results['smiles_dist']))
+                    # parents_children_mol_distances.append(np.mean(ga_results['mol_dist']))
 
                     child_score = np.array(self.oracle(child_smis))
+                    if child_score.max() > ga_best:
+                        ga_best = child_score.max()
                 
                     new_experience = zip(child_smis, child_score)
                     experience.add_experience(new_experience)
@@ -167,7 +232,12 @@ class Genetic_GFN_Optimizer(BaseOptimizer):
                     if self.finish:
                         print('max oracle hit')
                         break
-                
+            
+            best_scores.append([policy_best, ga_best, prev_best])
+
+            if max(ga_best, policy_best) > prev_best:
+                prev_best = max(ga_best, policy_best)
+
             # Experience Replay
             # First sample
             avg_loss = 0.
@@ -185,6 +255,9 @@ class Genetic_GFN_Optimizer(BaseOptimizer):
 
                     exp_forward_flow = exp_agent_likelihood + log_z
                     exp_backward_flow = reward * config['beta']
+                    if  config['penalty'] == 'pb':
+                        exp_backward_flow +=  prior_agent_likelihood
+
                     loss = torch.pow(exp_forward_flow - exp_backward_flow, 2).mean()
 
                     # KL penalty
@@ -201,4 +274,29 @@ class Genetic_GFN_Optimizer(BaseOptimizer):
                     optimizer.step()
 
             step += 1
+        
+        best_scores = np.array(best_scores)
+
+        results = {'exp_policy_smiles_novelty': policy_smiles_novelty, 
+                    'exp_policy_smiles_norm_novelty': policy_smiles_norm_novelty, 
+                    'exp_policy_mol_novelty': policy_mol_novelty, 
+                    'exp_ga_smiles_norm_novelty': ga_smiles_norm_novelty, 
+                    'exp_ga_smiles_novelty': ga_smiles_novelty, 
+                    'exp_ga_mol_novelty': ga_mol_novelty,
+                    'policy_ga_smiles_norm_novelty': policy_ga_smiles_norm_novelty, 
+                    'policy_ga_smiles_novelty': policy_ga_smiles_novelty, 
+                    'policy_ga_mol_novelty': policy_ga_mol_novelty,
+                    'policy_smiles_norm_diversity': policy_smiles_norm_diversity,
+                    'policy_smiles_diversity': policy_smiles_diversity,
+                    'policy_mol_diversity': policy_mol_diversity,
+                    'policy_best_scores': best_scores[:, 0],
+                    'ga_best_scores': best_scores[:, 1],
+                    'tot_best_scores': best_scores[:, 2],}
+        
+        if config['rank_coefficient'] < 0.1:
+            with open(f'./main/genetic_gfn/ga_results/run_{oracle.name}_results_seed{self.seed}.pkl', 'wb') as f:
+                pickle.dump(results, f)
+            # results.to_pickle('./main/genetic_gfn/ga_results/run_' + oracle.name + '_results.pkl')
+            tot_ga_results.to_pickle(f'./main/genetic_gfn/ga_results/run_{oracle.name}_ga_results_seed{self.seed}.pkl')
+            tot_ga_results.to_csv(f'./main/genetic_gfn/ga_results/run_{oracle.name}_ga_results_seed{self.seed}.csv', index=False)
 

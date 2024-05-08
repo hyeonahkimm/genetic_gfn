@@ -196,3 +196,6 @@ dream_results
 
 # GEGL
 main/gegl/results
+main/genetic_gfn/results
+main/genetic_gfn/ga_results
+main/genetic_gfn_al/results
