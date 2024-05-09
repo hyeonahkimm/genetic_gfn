@@ -41,5 +41,8 @@ class UCB(AcquisitionFunctionWrapper):
         self.kappa = args['kappa']
     
     def __call__(self, x):
+        if self.kappa == 0.0:
+            mean, _ = self.model.eval(x)
+            return self.l2r(mean)
         mean, std = self.model.forward_with_uncertainty(x)
         return self.l2r(mean + self.kappa * std)

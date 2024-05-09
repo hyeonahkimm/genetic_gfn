@@ -123,10 +123,12 @@ class Genetic_GFN_AL_Optimizer(BaseOptimizer):
 
         best_scores = []
 
+        eps_noise = 0.05 if config['population_size'] == 0 else 0.0
+
         # Random sample and pretrain
         # smiles = sample(config, Agent, oracle, voc, initial=True)
         print("Initializing the datasets ...")
-        seqs, agent_likelihood, _ = Agent.sample(config['num_init_samples'])
+        seqs, agent_likelihood, _ = Agent.sample(config['num_init_samples'], eps=eps_noise)
         # Remove duplicates, ie only consider unique seqs
         unique_idxs = unique(seqs)
         seqs = seqs[unique_idxs]
@@ -183,7 +185,8 @@ class Genetic_GFN_AL_Optimizer(BaseOptimizer):
             pbar.set_description('Generative model training')
             for i in pbar:
                 # Sample from Agent
-                seqs, agent_likelihood, entropy = Agent.sample(config['batch_size'])
+                with torch.no_grad():
+                    seqs, agent_likelihood, entropy = Agent.sample(config['batch_size'], eps=eps_noise)
 
                 # Remove duplicates, ie only consider unique seqs
                 unique_idxs = unique(seqs)
@@ -198,7 +201,8 @@ class Genetic_GFN_AL_Optimizer(BaseOptimizer):
                     smiles = sanitize(smiles)
                 
                 # score = np.array(self.oracle(smiles))
-                ys = proxy(seqs).view(-1).cpu().detach().numpy()
+                with torch.no_grad():
+                    ys = proxy(seqs).view(-1).cpu().detach().numpy()
 
                 # Then add new experience
                 new_experience = zip(smiles, ys)
@@ -230,7 +234,8 @@ class Genetic_GFN_AL_Optimizer(BaseOptimizer):
                         if len(encoded) > 0:
                             encoded = MolData.collate_fn(encoded)
 
-                            child_score = proxy(encoded).view(-1).cpu().detach().numpy()
+                            with torch.no_grad():
+                                child_score = proxy(encoded).view(-1).cpu().detach().numpy()
                         
                             new_experience = zip(child_smis, child_score)
                             experience.add_experience(new_experience)
@@ -278,7 +283,7 @@ class Genetic_GFN_AL_Optimizer(BaseOptimizer):
 
             # Random sample and pretrain
             # smiles, score = sample(config, Agent, oracle, voc, initial=False)
-            seqs, agent_likelihood, _ = Agent.sample(config['num_samples'])
+            seqs, agent_likelihood, _ = Agent.sample(config['num_samples'], eps=eps_noise)
             # Remove duplicates, ie only consider unique seqs
             unique_idxs = unique(seqs)
             seqs = seqs[unique_idxs]

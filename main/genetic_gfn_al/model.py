@@ -68,7 +68,7 @@ class RNN():
             entropy += -torch.sum((log_prob * prob), 1)
         return log_probs, entropy
 
-    def sample(self, batch_size, max_length=140, temp=1.0):
+    def sample(self, batch_size, max_length=140, temp=1.0, eps=0.):
         """
             Sample a batch of sequences
 
@@ -108,6 +108,8 @@ class RNN():
             # print('logits shape', logits.shape) ##### [128, 109]
             prob = F.softmax(logits, dim = 1)
             log_prob = F.log_softmax(logits / temp, dim = 1)
+            if eps > 0. and torch.rand(1) < eps:
+                x = torch.randint(prob.size(1), (prob.size(0),))
             x = torch.multinomial(prob, num_samples=1).view(-1)
             sequences.append(x.view(-1, 1))
             log_probs +=  NLLLoss(log_prob, x)
