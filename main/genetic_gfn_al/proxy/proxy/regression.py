@@ -161,6 +161,57 @@ class DropoutRegressor(nn.Module):
 
 
 class EnsembleRegressor(nn.Module):
+    def __init__(self, tokenizer,num_token,max_len,args,device='cuda:0'):
+        super().__init__()
+
+        self.num_tokens = num_token
+        self.max_len = max_len
+        self.tokenizer = tokenizer
+        self.sigmoid = nn.Sigmoid()
+        self.args = args
+        self.device = device
+        self.init_model()
+        #self.eos_tok = 4
+
+    def init_model(self):
+
+        self.models = [MLP(num_tokens=self.num_tokens,
+                            num_outputs=1,
+                            num_hid=self.args['proxy_nemb'],
+                            num_layers=self.args['proxy_layers'], # TODO: add these as hyperparameters?
+                            dropout=self.args['proxy_dropout'],
+                            max_len=self.max_len) for i in range(self.args.proxy_num_dropout_samples)]
+        [model.to(self.args.device) for model in self.models]
+        self.params = sum([list(model.parameters()) for model in self.models], [])
+
+        self.opt = torch.optim.Adam(self.params, self.args['proxy_learning_rate'],
+                            weight_decay=self.args['proxy_weight_decay'])
+            
+    def fit(self, data, reset=False):
+        if reset:
+            self.init_model()
+
+        pbar = tqdm(range(self.args['proxy_num_iterations']))
+        pbar.set_description('Proxy training')
+        for i in pbar:
+            x, y = data.sample(self.args['proxy_mbsize'])
+
+            inp_x = F.one_hot(x.long(), num_classes=self.num_tokens+1)[:, :, :-1].to(torch.float32)
+            inp = torch.zeros(x.shape[0], self.max_len, self.num_tokens)
+            inp[:, :inp_x.shape[1], :] = inp_x
+            x = inp.reshape(x.shape[0], -1).to(self.device).detach()
+            y = torch.tensor(y, device=self.device, dtype=torch.float).reshape(-1)
+
+            output = self.model(x, None).squeeze(1)
+            loss = (output - y).pow(2).mean()
+            loss.backward()
+            self.opt.step()
+            self.opt.zero_grad()
+
+            pbar.set_postfix(loss = loss.item())
+
+
+class EnsembleRegressor(nn.Module):
     def __init__(self, tokenizer,num_token,max_len):
         super().__init__()
 

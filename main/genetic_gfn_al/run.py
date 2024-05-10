@@ -130,47 +130,49 @@ class Genetic_GFN_AL_Optimizer(BaseOptimizer):
         # Random sample and pretrain
         # smiles = sample(config, Agent, oracle, voc, initial=True)
         print("Initializing the datasets ...")
-        seqs, agent_likelihood, _ = Agent.sample(config['num_init_samples'], eps=eps_noise)
-        # Remove duplicates, ie only consider unique seqs
-        unique_idxs = unique(seqs)
-        seqs = seqs[unique_idxs]
-        agent_likelihood = agent_likelihood[unique_idxs]
+        for _ in range(5):
+            seqs, agent_likelihood, _ = Agent.sample(config['num_init_samples'], eps=eps_noise)
+            # Remove duplicates, ie only consider unique seqs
+            unique_idxs = unique(seqs)
+            seqs = seqs[unique_idxs]
+            agent_likelihood = agent_likelihood[unique_idxs]
 
-        smiles = seq_to_smiles(seqs, voc)
-        if config['valid_only']:
-            smiles = sanitize(smiles)
-        score = np.array(self.oracle(smiles))
-        
-        # Then add new experience
-        new_experience = zip(smiles, score)
-        proxy_dataset.add_experience(new_experience)
+            smiles = seq_to_smiles(seqs, voc)
+            if config['valid_only']:
+                smiles = sanitize(smiles)
+            score = np.array(self.oracle(smiles))
+            
+            # Then add new experience
+            new_experience = zip(smiles, score)
+            proxy_dataset.add_experience(new_experience)
+
+            if config['population_size'] and len(proxy_dataset) > config['population_size']:
+                # self.oracle.sort_buffer()
+                pop_smis, pop_scores = proxy_dataset.get_elems()
+
+                mating_pool = (pop_smis[:config['num_keep']], pop_scores[:config['num_keep']])
+
+                for g in range(config['ga_generations']):
+                    child_smis, child_n_atoms, pop_smis, pop_scores = ga_handler.query(
+                            query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, 
+                            rank_coefficient=config['rank_coefficient'], return_dist=False
+                        )
+                    
+                    # tot_ga_results = pd.concat([tot_ga_results, pd.DataFrame(ga_results)])
+
+                    child_score = np.array(self.oracle(child_smis))
+
+                    new_experience = zip(child_smis, child_score)
+                    proxy_dataset.add_experience(new_experience)
+
+                    mating_pool = (pop_smis+child_smis, pop_scores+child_score.tolist())
+
         print(len(proxy_dataset), 'train mols')
-
-        if config['population_size'] and len(proxy_dataset) > config['population_size']:
-            # self.oracle.sort_buffer()
-            pop_smis, pop_scores = proxy_dataset.get_elems()
-
-            mating_pool = (pop_smis[:config['num_keep']], pop_scores[:config['num_keep']])
-
-            for g in range(config['ga_generations']):
-                child_smis, child_n_atoms, pop_smis, pop_scores = ga_handler.query(
-                        query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, 
-                        rank_coefficient=config['rank_coefficient'], return_dist=False
-                    )
-                
-                # tot_ga_results = pd.concat([tot_ga_results, pd.DataFrame(ga_results)])
-
-                child_score = np.array(self.oracle(child_smis))
-
-                new_experience = zip(child_smis, child_score)
-                proxy_dataset.add_experience(new_experience)
-
-                mating_pool = (pop_smis+child_smis, pop_scores+child_score.tolist())
-
         proxy.model.train()
         proxy.fit(proxy_dataset)
         
         prev_best = 0.
+        experience = Experience(voc, max_size=config['num_keep'])  # gen_model_dataset
         while True:
 
             if len(self.oracle) > 100:
@@ -179,7 +181,7 @@ class Genetic_GFN_AL_Optimizer(BaseOptimizer):
             else:
                 old_scores = 0
 
-            experience = Experience(voc, max_size=config['num_keep'])  # gen_model_dataset
+            # experience = Experience(voc, max_size=config['num_keep'])  # gen_model_dataset
             
             # Generative model training
             # print("Model training ...")
@@ -285,54 +287,57 @@ class Genetic_GFN_AL_Optimizer(BaseOptimizer):
 
             # Random sample and pretrain
             # smiles, score = sample(config, Agent, oracle, voc, initial=False)
-            seqs, agent_likelihood, _ = Agent.sample(config['num_samples'], eps=eps_noise)
-            # Remove duplicates, ie only consider unique seqs
-            unique_idxs = unique(seqs)
-            seqs = seqs[unique_idxs]
-            agent_likelihood = agent_likelihood[unique_idxs]
+            for _ in range(5):
+                seqs, agent_likelihood, _ = Agent.sample(config['num_samples'], eps=eps_noise)
+                # Remove duplicates, ie only consider unique seqs
+                unique_idxs = unique(seqs)
+                seqs = seqs[unique_idxs]
+                agent_likelihood = agent_likelihood[unique_idxs]
 
-            smiles = seq_to_smiles(seqs, voc)
-            if config['valid_only']:
-                smiles = sanitize(smiles)
-            score = np.array(self.oracle(smiles))
+                smiles = seq_to_smiles(seqs, voc)
+                if config['valid_only']:
+                    smiles = sanitize(smiles)
+                score = np.array(self.oracle(smiles))
+                
+                # Then add new experience
+                new_experience = zip(smiles, score)
+                proxy_dataset.add_experience(new_experience)
+
+                if self.finish:
+                    print('max oracle hit, abort ...... ')
+                    break 
+
+                if config['population_size'] and len(proxy_dataset) > config['population_size']:
+                    # self.oracle.sort_buffer()
+                    pop_smis, pop_scores = proxy_dataset.get_elems()
+
+                    mating_pool = (pop_smis[:config['num_keep']], pop_scores[:config['num_keep']])
+
+                    for g in range(config['ga_generations']):
+                        child_smis, child_n_atoms, pop_smis, pop_scores = ga_handler.query(
+                                query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, 
+                                rank_coefficient=config['rank_coefficient'], return_dist=False
+                            )
+                        
+                        # tot_ga_results = pd.concat([tot_ga_results, pd.DataFrame(ga_results)])
+
+                        child_score = np.array(self.oracle(child_smis))
+
+                        new_experience = zip(child_smis, child_score)
+                        proxy_dataset.add_experience(new_experience)
+
+                        mating_pool = (pop_smis+child_smis, pop_scores+child_score.tolist())
             
-            # Then add new experience
-            new_experience = zip(smiles, score)
-            proxy_dataset.add_experience(new_experience)
+                if self.finish:
+                    print('max oracle hit, abort ...... ')
+                    break 
+            if self.finish:
+                print('max oracle hit, abort ...... ')
+                break 
+            
             print(len(proxy_dataset), 'train mols')
-
-            if self.finish:
-                print('max oracle hit, abort ...... ')
-                break 
-
-            if config['population_size'] and len(proxy_dataset) > config['population_size']:
-                # self.oracle.sort_buffer()
-                pop_smis, pop_scores = proxy_dataset.get_elems()
-
-                mating_pool = (pop_smis[:config['num_keep']], pop_scores[:config['num_keep']])
-
-                for g in range(config['ga_generations']):
-                    child_smis, child_n_atoms, pop_smis, pop_scores = ga_handler.query(
-                            query_size=config['offspring_size'], mating_pool=mating_pool, pool=pool, 
-                            rank_coefficient=config['rank_coefficient'], return_dist=False
-                        )
-                    
-                    # tot_ga_results = pd.concat([tot_ga_results, pd.DataFrame(ga_results)])
-
-                    child_score = np.array(self.oracle(child_smis))
-
-                    new_experience = zip(child_smis, child_score)
-                    proxy_dataset.add_experience(new_experience)
-
-                    mating_pool = (pop_smis+child_smis, pop_scores+child_score.tolist())
-            
-            if self.finish:
-                print('max oracle hit, abort ...... ')
-                break 
-            
             proxy.model.train()
             proxy.update(proxy_dataset)
-
             
             # early stopping
             if len(self.oracle) > 1000:
