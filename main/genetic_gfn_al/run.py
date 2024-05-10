@@ -123,7 +123,9 @@ class Genetic_GFN_AL_Optimizer(BaseOptimizer):
 
         best_scores = []
 
-        eps_noise = 0.05 if config['population_size'] == 0 else 0.0
+        assert config['random_action_prob'] * config['population_size'] == 0, "Cannot have both random actions and population size > 0"
+
+        eps_noise = config['random_action_prob'] if config['population_size'] == 0 else 0.0
 
         # Random sample and pretrain
         # smiles = sample(config, Agent, oracle, voc, initial=True)

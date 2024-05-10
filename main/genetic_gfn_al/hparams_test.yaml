@@ -26,3 +26,4 @@ proxy_nemb: 512
 proxy_layers: 3
 kappa: 0.1
 gamma: 0.5
+random_action_prob: 0.0
