@@ -15,13 +15,15 @@ penalty: prior_kl
 valid_only: True
 kl_coefficient: 0.01
 proxy_num_iterations: 25
-num_init_samples: 500 # Number of random samples to train proxy
-num_samples: 500 # Number of new samples each loop
-num_iterations: 10 # Number of inner iterations to run within a loop
+num_init_samples: 64 # Number of random samples to train proxy
+num_samples: 64 # Number of new samples each loop
+num_proxy_init_sample_iterations: 6
+num_proxy_sample_iterations: 6
+num_iterations: 10  # Number of inner iterations to run within a loop
 proxy_mbsize: 64
-proxy_learning_rate: 2.5e-4
-proxy_dropout: 0.1
+proxy_learning_rate: 0.00025
 proxy_weight_decay: 0.000001
+proxy_dropout: 0.0
 proxy_nemb: 512
 proxy_layers: 3
 kappa: 0.1

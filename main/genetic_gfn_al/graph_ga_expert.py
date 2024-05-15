@@ -44,8 +44,11 @@ def make_mating_pool(population_mol: List[Mol], population_scores, population_si
         indices = list(torch.utils.data.WeightedRandomSampler(
             weights=weights, num_samples=population_size, replacement=True
             ))
-        mating_pool = [population_mol[i] for i in indices if population_mol[i] is not None]
-        mating_pool_score = [population_scores[i] for i in indices if population_mol[i] is not None]
+        try:
+            mating_pool = [population_mol[i] for i in indices if population_mol[i] is not None]
+            mating_pool_score = [population_scores[i] for i in indices if population_mol[i] is not None]
+        except:
+            import pdb; pdb.set_trace()
         # print(mating_pool)
     else:
         population_scores = [s + MINIMUM for s in population_scores]
