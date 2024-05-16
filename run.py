@@ -124,6 +124,10 @@ def main():
         from main.genetic_gfn_selfies.run import Genetic_GFN_SELFIES_Optimizer as Optimizer
     elif args.method == "genetic_gfn_al":
         from main.genetic_gfn_al.run import Genetic_GFN_AL_Optimizer as Optimizer
+    elif args.method == "reinvent_ls_gfn":
+        from main.genetic_gfn.run_ls_gfn import REINVENT_LS_GFN_Optimizer as Optimizer
+        path_main = os.path.dirname(os.path.realpath(__file__))
+        path_main = os.path.join(path_main, "main", "genetic_gfn")
     else:
         raise ValueError("Unrecognized method name.")
 
