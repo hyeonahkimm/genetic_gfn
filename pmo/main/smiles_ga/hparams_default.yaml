@@ -1,0 +1,3 @@
+gene_size: 200
+population_size: 50
+n_mutations: 500

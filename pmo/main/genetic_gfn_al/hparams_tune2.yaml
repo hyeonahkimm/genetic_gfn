@@ -1,0 +1,12 @@
+name: gfn_al
+method: grid
+metric:
+  goal: maximize
+  name: avg_auc
+parameters:
+  proxy_num_iterations:
+    values: [25, 50, 100]
+  num_iterations:
+    values: [10, 50, 100]
+  kappa:
+    values: [0.1, 0.0]

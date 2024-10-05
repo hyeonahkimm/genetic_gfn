@@ -1,0 +1,10 @@
+name: gegl
+method: grid
+metric:
+  goal: maximize
+  name: avg_auc
+parameters:
+  expert_sampling_batch_size:
+    values: [64, 128, 256]
+  num_keep:
+    values: [128, 256, 512, 1024]

@@ -1,0 +1,12 @@
+name: smiles_lstm_hc
+method: grid
+metric:
+  goal: maximize
+  name: avg_auc
+parameters:
+  population_size:
+    values: [50, 100]
+  optimize_n_epochs:
+    values: [1, 2, 5, 10]
+  optimize_batch_size:
+    values: [128, 256, 512]

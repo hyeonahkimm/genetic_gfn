@@ -1,0 +1,8 @@
+name: moldqn
+method: random
+metric:
+  goal: maximize
+  name: avg_auc
+parameters:
+  fingerprint_length: 
+    value: 1024

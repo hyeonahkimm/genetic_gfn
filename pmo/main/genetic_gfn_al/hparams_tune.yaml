@@ -1,0 +1,14 @@
+name: genetic_gfn_al
+method: grid
+metric:
+  goal: maximize
+  name: avg_auc
+parameters:
+  proxy_nemb:
+    values: [512, 1024]
+  proxy_layers:
+    values: [2, 3]
+  kappa:
+    values: [0.0, 0.1]
+  gamma:
+    values: [0.5, 0.8]

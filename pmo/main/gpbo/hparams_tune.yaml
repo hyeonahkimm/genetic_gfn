@@ -1,0 +1,34 @@
+name: gp_bo
+method: bayes
+metric:
+  goal: maximize
+  name: avg_auc
+parameters:
+  initial_population_size:
+    distribution: int_uniform
+    min: 100
+    max: 500
+  n_train_gp_best: 
+    distribution: int_uniform
+    min: 1000
+    max: 3000
+  n_train_gp_rand:     
+    distribution: int_uniform
+    min: 1000
+    max: 3000
+  bo_batch_size:
+    distribution: int_uniform
+    min: 500
+    max: 1500
+  ga_max_generations:
+    distribution: int_uniform
+    min: 25
+    max: 100
+  ga_offspring_size:
+    distribution: int_uniform
+    min: 100
+    max: 300
+  ga_population_size:
+    distribution: int_uniform
+    min: 300
+    max: 1000

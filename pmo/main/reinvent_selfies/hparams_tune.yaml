@@ -1,0 +1,14 @@
+name: reinvent_selfies
+method: grid
+metric:
+  goal: maximize
+  name: avg_auc
+parameters:
+  learning_rate: 
+    values: [0.0005, 0.0001]
+  batch_size:
+    values: [64, 128]
+  sigma: 
+    values: [5, 10, 20, 30, 50]
+  experience_replay: 
+    values: [0, 4, 8]

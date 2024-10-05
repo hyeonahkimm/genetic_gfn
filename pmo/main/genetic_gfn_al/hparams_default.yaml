@@ -1,0 +1,31 @@
+learning_rate: 0.0005
+batch_size: 64
+num_keep: 1024
+experience_loop: 1
+experience_replay: 64
+lr_z: 0.1
+beta: 50
+mutation_rate: 0.01
+population_size: 64
+offspring_size: 8
+ga_generations: 2
+rank_coefficient: 0.01
+num_jobs: 1
+penalty: prior_kl
+valid_only: True
+kl_coefficient: 0.01
+proxy_num_iterations: 25
+num_init_samples: 64 # Number of random samples to train proxy
+num_samples: 64 # Number of new samples each loop
+num_proxy_init_sample_iterations: 6
+num_proxy_sample_iterations: 6
+num_iterations: 25  # Number of inner iterations to run within a loop
+proxy_mbsize: 64
+proxy_learning_rate: 0.00025
+proxy_weight_decay: 0.000001
+proxy_dropout: 0.0
+proxy_nemb: 512
+proxy_layers: 3
+kappa: 0.1
+gamma: 0.5
+random_action_prob: 0.0

@@ -1,0 +1,10 @@
+name: genetic_gfn
+method: grid
+metric:
+  goal: maximize
+  name: avg_auc
+parameters:
+  learning_rate:
+    values: [0.001, 0.0001, 0.0005]
+  batch_size:
+    values: [32, 64, 128]

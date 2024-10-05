@@ -1,0 +1,13 @@
+dataset: "zinc"
+apprentice_load_dir: "main/gegl/resource/checkpoint/zinc"
+max_smiles_length: 140
+learning_rate: 0.001
+mutation_rate: 0.01
+num_keep: 128
+max_sampling_batch_size: 1024
+apprentice_sampling_batch_size: 128
+expert_sampling_batch_size: 128
+apprentice_training_batch_size: 64
+num_apprentice_training_steps: 8
+num_jobs: 1
+use_tb_loss: False

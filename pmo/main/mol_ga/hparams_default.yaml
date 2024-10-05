@@ -1,0 +1,6 @@
+max_generations: 20000
+offspring_size: 5
+starting_population_size: 100
+population_size: 500
+parallel: False
+ncpu: 1

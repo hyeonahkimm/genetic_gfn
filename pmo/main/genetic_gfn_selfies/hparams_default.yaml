@@ -1,0 +1,14 @@
+learning_rate: 0.0005
+batch_size: 64
+num_keep: 1024
+experience_loop: 8
+experience_replay: 64
+lr_z: 0.1
+beta: 50
+mutation_rate: 0.01
+population_size: 64
+offspring_size: 8
+ga_generations: 2
+rank_coefficient: 0.01
+num_jobs: 1
+kl_coefficient: 0.01
