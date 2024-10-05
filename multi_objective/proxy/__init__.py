@@ -1,0 +1,1 @@
+from proxy.proxy import get_proxy
