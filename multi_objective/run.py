@@ -54,8 +54,6 @@ def main():
     # Add method name here when adding new ones
     if args.method == "genetic_gfn":
         from genetic_gfn.run import Genetic_GFN_Optimizer as Optimizer
-    # elif args.method == "genetic_gfn_selfies":
-    #     from main.genetic_gfn_selfies.run import Genetic_GFN_SELFIES_Optimizer as Optimizer
     else:
         raise ValueError("Unrecognized method name.")
 
