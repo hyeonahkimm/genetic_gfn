@@ -32,7 +32,7 @@ pip install -r requirements.txt
 For other baseline, please see `README_PMO.md`; we recommend using Python 3.8 for `GP BO` and `requirement_gpbo.txt`.
 When you use Python 3.8, you can install rdkit with `pip install rdkit-pypi`.
 
-To run other experiments, including multi-objective and SARS-CoV-2, please see `README.md` in each directory.
+To run other experiments, including multi-objective and SARS-CoV-2, please see `README.md` in each directory and their original repository.
 
 
 ## Usage
