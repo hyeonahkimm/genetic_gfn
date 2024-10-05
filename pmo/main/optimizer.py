@@ -362,7 +362,7 @@ class BaseOptimizer:
     def optimize(self, oracle, config, seed=0, project="test"):
         # run = wandb.init(project=project, config=config, reinit=True, entity="mol_opt")
         if self.args.wandb != 'disabled':
-            project = 'pmo' if self.args.method.startswith('genetic_gfn') else 'pmo_baselines'
+            project = 'pmo'
             run = wandb.init(project=project, group=oracle.name, config=config, reinit=True)
             wandb.config.oracle = oracle.name
             wandb.config.method = self.args.method

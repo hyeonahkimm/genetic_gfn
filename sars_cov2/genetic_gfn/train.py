@@ -80,10 +80,7 @@ class Genetic_GFN_trainer():
 
     def _memory_update(self, smiles, scores, all_scores):
         scores = list(scores)
-        # seqs_list = [seqs[i, :].cpu().numpy() for i in range(len(smiles))]
-
-        # fps_memory = list(self.memory["fps"])
-
+        
         mean_coef = 0
         for i in range(len(smiles)):
             if scores[i] < 0:
@@ -93,12 +90,6 @@ class Genetic_GFN_trainer():
             new_data = pd.DataFrame({"smiles": smiles[i], "scores": scores[i], "all_scores": [all_scores[i]]})
             # new_data = pd.DataFrame({"smiles": smiles[i], "scores": scores[i], "seqs": [seqs_list[i]], "all_scores": [all_scores[i]]})
             self.memory = pd.concat([self.memory, new_data], ignore_index=True, sort=False)
-
-            # penalize similarity
-            # if self.sim_penalize and len(fps_memory) > 0:
-            #     sims = [DataStructs.FingerprintSimilarity(fp[0], x) for x in fps_memory]
-            #     if np.sum(np.array(sims) >= self.sim_thres) > 20:
-            #     	scores[i] = 0
 
         self.memory = self.memory.drop_duplicates(subset=["smiles"])
         self.memory = self.memory.sort_values('scores', ascending=False)
@@ -161,13 +152,9 @@ class Genetic_GFN_trainer():
             prior_likelihood, _ = Prior.likelihood(Variable(seqs))
             smiles = seq_to_smiles(seqs, voc)
 
-            # scores = np.array(self.score_smi(smiles))
             all_scores = np.array(get_scores(smiles, mode=self.oracle))
-            # import pdb; pdb.set_trace()
             all_scores = all_scores.reshape(-1, num_metric)
-            scores = all_scores[:, 0]  #np.clip(all_scores[:, 0], a_min=0., a_max=10.)
-            # print(scores.max(), scores.mean())
-            # print('docking score:', all_scores[:, 1].min(), all_scores[:, 1].mean())
+            scores = all_scores[:, 0]
             smiles, scores, all_scores = sa_filter(smiles, scores, all_scores[:, 1:])
             self._memory_update(smiles, scores, all_scores)
             
@@ -176,9 +163,7 @@ class Genetic_GFN_trainer():
 
             # Genetic search
             if self.population_size and len(self.memory) > self.population_size:
-                # mating_pool = (self.memory.smiles.tolist(), self.memory.scores.tolist())
-                # import pdb; pdb.set_trace()
-                # pop_smis, pop_scores = ga_handler.select_pop(self.memory.smiles.tolist(), self.memory.scores.tolist(), self.population_size, rank_coefficient=self.rank_coefficient)
+                
                 population = (self.memory.smiles.tolist(), self.memory.scores.tolist())  #(pop_smis, pop_scores)
                 for g in range(self.ga_generations):
                     child_smis, child_n_atoms, pop_smis, pop_scores = ga_handler.query(
@@ -186,11 +171,9 @@ class Genetic_GFN_trainer():
                             rank_coefficient=self.rank_coefficient, 
                         )
 
-                    # child_score = np.array(self.oracle(child_smis))
                     child_all_scores = np.array(get_scores(child_smis, mode=self.oracle))
                     child_all_scores = child_all_scores.reshape(-1, num_metric)
                     child_score = child_all_scores[:, 0]
-                    # import pdb; pdb.set_trace()
                     child_smis, child_score, child_all_scores = sa_filter(child_smis, child_score, child_all_scores[:, 1:])
                     self._memory_update(child_smis, child_score, child_all_scores)
                 
@@ -224,7 +207,6 @@ class Genetic_GFN_trainer():
 
                     optimizer.zero_grad()
                     loss.backward()
-                    # grad_norms = torch.nn.utils.clip_grad_norm_(Agent.rnn.parameters(), 1.0)
                     optimizer.step()
 
             # import pdb; pdb.set_trace()
@@ -321,29 +303,11 @@ class REINVENT_trainer():
             new_data = pd.DataFrame({"smiles": smiles[i], "scores": scores[i], "seqs": [seqs_list[i]], "all_scores": [all_scores[i]]})
             self.memory = pd.concat([self.memory, new_data], ignore_index=True, sort=False)
 
-            # penalize similarity
-            # if self.sim_penalize and len(fps_memory) > 0:
-            #     sims = [DataStructs.FingerprintSimilarity(fp[0], x) for x in fps_memory]
-            #     if np.sum(np.array(sims) >= self.sim_thres) > 20:
-            #     	scores[i] = 0
-
         self.memory = self.memory.drop_duplicates(subset=["smiles"])
         self.memory = self.memory.sort_values('scores', ascending=False)
         self.memory = self.memory.reset_index(drop=True)
         if len(self.memory) > self.memory_size:
             self.memory = self.memory.head(self.memory_size)
-
-        # # experience replay
-        # if self.replay > 0:
-        #     s = min(len(self.memory), self.replay)
-        #     experience = self.memory.head(5 * self.replay).sample(s)
-        #     experience = experience.reset_index(drop=True)
-        #     smiles += list(experience["smiles"])
-        #     scores += list(experience["scores"])
-        #     for index in experience.index:
-        #         seqs = torch.cat((seqs, torch.tensor(experience.loc[index, "seqs"], dtype=torch.long).view(1, -1).cuda()), dim=0)
-
-        # return smiles, np.array(scores), seqs
 
 
     def train(self):
@@ -394,11 +358,10 @@ class REINVENT_trainer():
             prior_likelihood, _ = Prior.likelihood(Variable(seqs))
             smiles = seq_to_smiles(seqs, voc)
 
-            # scores = np.array(self.score_smi(smiles))
             all_scores = np.array(get_scores(smiles, mode=self.oracle))
             # import pdb; pdb.set_trace()
             all_scores = all_scores.reshape(-1, num_metric)
-            scores = all_scores[:, 0]  #np.clip(all_scores[:, 0], a_min=0., a_max=10.)
+            scores = all_scores[:, 0]
             # print(scores.max(), scores.mean())
             # print('docking score:', all_scores[:, 1].min(), all_scores[:, 1].mean())
             self._memory_update(smiles, scores, seqs, all_scores[:, 1:])

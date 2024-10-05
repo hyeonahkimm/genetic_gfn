@@ -7,14 +7,12 @@ sys.path.append('/'.join(path_here.rstrip('/').split('/')[:-2]))
 from optimizer import BaseOptimizer
 from genetic_gfn.utils import Variable, seq_to_smiles, unique
 from genetic_gfn.model import RNN
-from genetic_gfn.data_structs import Vocabulary, Experience, MolData
-# from priority_queue import MaxRewardPriorityQueue
+from genetic_gfn.data_structs import Vocabulary, Experience,
 import torch
 from rdkit import Chem
 
 from joblib import Parallel
-from genetic_gfn.graph_ga_expert import GeneticOperatorHandler, select_pop
-# from smiles_ga_expert import GeneticOperatorHandler as SmilesGA
+from genetic_gfn.graph_ga_expert import GeneticOperatorHandler,
 
 
 def sanitize(smiles):
@@ -101,7 +99,6 @@ class Genetic_GFN_Optimizer(BaseOptimizer):
             entropy = entropy[unique_idxs]
 
             # Get prior likelihood and score
-            # prior_likelihood, _ = Prior.likelihood(Variable(seqs))
             smiles = seq_to_smiles(seqs, voc)
             if config['valid_only']:
                 smiles = sanitize(smiles)
@@ -200,7 +197,6 @@ class Genetic_GFN_Optimizer(BaseOptimizer):
 
                     optimizer.zero_grad()
                     loss.backward()
-                    # grad_norms = torch.nn.utils.clip_grad_norm_(Agent.rnn.parameters(), 1.0)
                     optimizer.step()
 
             step += 1
