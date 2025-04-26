@@ -46,11 +46,7 @@ def main():
     
     print(args.method)
     # Add method name here when adding new ones
-    if args.method == 'screening':
-        from main.screening.run import Exhaustive_Optimizer as Optimizer 
-    elif args.method == 'molpal':
-        from main.molpal.run import MolPAL_Optimizer as Optimizer
-    elif args.method == 'graph_ga':
+    if args.method == 'graph_ga':
         from main.graph_ga.run import GB_GA_Optimizer as Optimizer
     elif args.method == 'smiles_ga':
         from main.smiles_ga.run import SMILES_GA_Optimizer as Optimizer
@@ -58,64 +54,24 @@ def main():
         from main.selfies_ga.run import SELFIES_GA_Optimizer as Optimizer
     elif args.method == "synnet":
         from main.synnet.run import SynNet_Optimizer as Optimizer
-    elif args.method == 'hebo':
-        from main.hebo.run import HEBO_Optimizer as Optimizer 
-    elif args.method == 'graph_mcts':
-        from main.graph_mcts.run import Graph_MCTS_Optimizer as Optimizer
-    elif args.method == 'smiles_ahc':
-        from main.smiles_ahc.run import AHC_Optimizer as Optimizer
-    elif args.method == 'smiles_aug_mem':
-        from main.smiles_aug_mem.run import AugmentedMemory_Optimizer as Optimizer 
-    elif args.method == 'smiles_bar':
-        from main.smiles_bar.run import BAR_Optimizer as Optimizer 
     elif args.method == "smiles_lstm_hc":
         from main.smiles_lstm_hc.run import SMILES_LSTM_HC_Optimizer as Optimizer
     elif args.method == 'selfies_lstm_hc':
         from main.selfies_lstm_hc.run import SELFIES_LSTM_HC_Optimizer as Optimizer
-    elif args.method == 'dog_gen':
-        from main.dog_gen.run import DoG_Gen_Optimizer as Optimizer
     elif args.method == 'gegl':
-        from main.gegl.run import GEGL_Optimizer as Optimizer 
-    elif args.method == 'boss':
-        from main.boss.run import BOSS_Optimizer as Optimizer
-    elif args.method == 'chembo':
-        from main.chembo.run import ChemBOoptimizer as Optimizer 
+        from main.gegl.run import GEGL_Optimizer as Optimizer
     elif args.method == 'gpbo':
         from main.gpbo.run import GPBO_Optimizer as Optimizer
     elif args.method == 'stoned': 
         from main.stoned.run import Stoned_Optimizer as Optimizer
-    elif args.method == "selfies_vae":
-        from main.selfies_vae.run import SELFIES_VAEBO_Optimizer as Optimizer
-    elif args.method == "smiles_vae":
-        from main.smiles_vae.run import SMILES_VAEBO_Optimizer as Optimizer
-    elif args.method == 'jt_vae':
-        from main.jt_vae.run import JTVAE_BO_Optimizer as Optimizer
-    elif args.method == 'dog_ae':
-        from main.dog_ae.run import DoG_AE_Optimizer as Optimizer
-    elif args.method == 'pasithea':
-        from main.pasithea.run import Pasithea_Optimizer as Optimizer
-    elif args.method == 'dst':
-        from main.dst.run import DST_Optimizer as Optimizer        
-    elif args.method == 'molgan':
-        from main.molgan.run import MolGAN_Optimizer as Optimizer
-    elif args.method == 'mars':
-        from main.mars.run import MARS_Optimizer as Optimizer
-    elif args.method == 'mimosa':
-        from main.mimosa.run import MIMOSA_Optimizer as Optimizer
     elif args.method == 'gflownet':
         from main.gflownet.run import GFlowNet_Optimizer as Optimizer
     elif args.method == 'gflownet_al':
         from main.gflownet_al.run import GFlowNet_AL_Optimizer as Optimizer
-    elif args.method == 'moldqn':
-        from main.moldqn.run import MolDQN_Optimizer as Optimizer
     elif args.method == 'reinvent':
         from main.reinvent.run import REINVENT_Optimizer as Optimizer
     elif args.method == 'reinvent_selfies':
         from main.reinvent_selfies.run import REINVENT_SELFIES_Optimizer as Optimizer
-    elif args.method == 'graphinvent':
-        from main.graphinvent.run import GraphInvent_Optimizer as Optimizer
-    elif args.method == "rationale_rl":
-        from main.rationale_rl.run import Rationale_RL_Optimizer as Optimizer
     elif args.method == "mol_ga":
         from main.mol_ga.run import MolGAOptimizer as Optimizer
     elif args.method == "genetic_gfn":
