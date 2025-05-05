@@ -12,32 +12,23 @@ import wandb
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
-import multiprocessing
 
-# rdkit
-from rdkit import Chem, DataStructs
-
-# from vocabulary import read_vocabulary
-from utils import calc_fingerprints
-from scoring_function import get_scores, int_div#, get_original_docking_scores
+# from utils import calc_fingerprints
+from scoring_function import get_scores, int_div
 
 from model import RNN
 from data_structs import Vocabulary, Experience
-# from scoring_functions import get_scoring_function
-from utils import Variable, seq_to_smiles, fraction_valid_smiles, unique
-# from vizard_logger import VizardLog
+from utils import Variable, seq_to_smiles, unique
 from joblib import Parallel
 from graph_ga_expert import GeneticOperatorHandler
 
 
 def sa_filter(smiles, scores, all_scores):
     filtered_smiles, filtered_scores, filtered_all_scores = [], [], []
-    # import pdb; pdb.set_trace()
     for i, (_, _, sa) in enumerate(all_scores):
         if sa < 4.0:
             filtered_smiles.append(smiles[i])
             filtered_scores.append(scores[i])
-            # filtered_seqs.append(seqs[i])
             filtered_all_scores.append(all_scores[i])
 
     return filtered_smiles, np.array(filtered_scores), np.stack(filtered_all_scores)
@@ -88,7 +79,6 @@ class Genetic_GFN_trainer():
             # canonicalized SMILES and fingerprints
             # fp, smiles_i = calc_fingerprints([smiles[i]])
             new_data = pd.DataFrame({"smiles": smiles[i], "scores": scores[i], "all_scores": [all_scores[i]]})
-            # new_data = pd.DataFrame({"smiles": smiles[i], "scores": scores[i], "seqs": [seqs_list[i]], "all_scores": [all_scores[i]]})
             self.memory = pd.concat([self.memory, new_data], ignore_index=True, sort=False)
 
         self.memory = self.memory.drop_duplicates(subset=["smiles"])
@@ -131,10 +121,13 @@ class Genetic_GFN_trainer():
                                             population_size=self.population_size)
         pool = Parallel(n_jobs=1)
 
-        if 'mpo' in self.oracle:
-            num_metric = 4
+        if 'docking' in self.oracle:
+            if 'mpo' in self.oracle:
+                num_metric = 4
+            else:
+                num_metric = 2
         else:
-            num_metric = 2
+            num_metric = 1
 
         print("Model initialized, starting training...")
 
@@ -155,7 +148,8 @@ class Genetic_GFN_trainer():
             all_scores = np.array(get_scores(smiles, mode=self.oracle))
             all_scores = all_scores.reshape(-1, num_metric)
             scores = all_scores[:, 0]
-            smiles, scores, all_scores = sa_filter(smiles, scores, all_scores[:, 1:])
+            if num_metric == 4:  # only for docking MPO
+                smiles, scores, all_scores = sa_filter(smiles, scores, all_scores[:, 1:])
             self._memory_update(smiles, scores, all_scores)
             
             new_experience = zip(smiles, scores)
@@ -174,7 +168,8 @@ class Genetic_GFN_trainer():
                     child_all_scores = np.array(get_scores(child_smis, mode=self.oracle))
                     child_all_scores = child_all_scores.reshape(-1, num_metric)
                     child_score = child_all_scores[:, 0]
-                    child_smis, child_score, child_all_scores = sa_filter(child_smis, child_score, child_all_scores[:, 1:])
+                    if num_metric == 4:  # only for docking MPO
+                        child_smis, child_score, child_all_scores = sa_filter(child_smis, child_score, child_all_scores[:, 1:])
                     self._memory_update(child_smis, child_score, child_all_scores)
                 
                     new_experience = zip(child_smis, child_score)
@@ -202,14 +197,12 @@ class Genetic_GFN_trainer():
                     loss_p = (exp_agent_likelihood - prior_agent_likelihood).mean()
                     loss += self.kl_coefficient*loss_p
 
-                    # print(loss.item())
                     avg_loss += loss.item()/self.experience_loop
 
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
 
-            # import pdb; pdb.set_trace()
             if len(self.memory) > 100:
 
                 log = {'top-1': self.memory["scores"][0], 
@@ -246,14 +239,11 @@ class Genetic_GFN_trainer():
 
 
             if (step + 1) % 20 == 0:
-                # torch.save(agents[0].state_dict(), args.output_dir + f"QED_finetuned_{step+1}.pt")
                 self.writer.add_scalar('top-100-div', int_div(list(self.memory["smiles"][:100])), step)
                 self.writer.add_scalar('memory-div', int_div(list(self.memory["smiles"])), step)
 
             if (step + 1) % 50 == 0:
                 self.memory.to_csv(f'outputs/{self.oracle}/genetic_gfn_{self.run_name}_{step+1}steps.csv')
-
-        # docking, qed, sa, mpo_score = get_original_docking_scores(self.memory["smiles"][:100], self.oracle)
 
         self.memory.to_csv(f'outputs/{self.oracle}/genetic_gfn_{self.run_name}_{self.n_steps}steps.csv')
         print(f'top-1 score: {self.memory["scores"][0]}')
@@ -268,7 +258,6 @@ class REINVENT_trainer():
         self.oracle = configs.oracle.strip()
         self.prior_path = configs.prior_path
         self.vocab_path = configs.vocab_path
-        # self.voc = read_vocabulary(configs.vocab_path)
         self.batch_size = configs.batch_size
         self.n_steps = configs.n_steps
         self.learning_rate = configs.learning_rate
@@ -359,11 +348,8 @@ class REINVENT_trainer():
             smiles = seq_to_smiles(seqs, voc)
 
             all_scores = np.array(get_scores(smiles, mode=self.oracle))
-            # import pdb; pdb.set_trace()
             all_scores = all_scores.reshape(-1, num_metric)
             scores = all_scores[:, 0]
-            # print(scores.max(), scores.mean())
-            # print('docking score:', all_scores[:, 1].min(), all_scores[:, 1].mean())
             self._memory_update(smiles, scores, seqs, all_scores[:, 1:])
 
             # Calculate augmented likelihood
@@ -376,7 +362,6 @@ class REINVENT_trainer():
                 exp_seqs, exp_score = experience.sample(self.experience_replay)
                 exp_prior_likelihood, _ = Prior.likelihood(exp_seqs.long())
                 exp_agent_likelihood, _ = Agent.likelihood(exp_seqs.long())
-                # import pdb; pdb.set_trace()
                 exp_augmented_likelihood = exp_prior_likelihood + self.sigma *  Variable(exp_score).float()
                 exp_loss = torch.pow((Variable(exp_augmented_likelihood) - exp_agent_likelihood), 2)
                 loss = torch.cat((loss, exp_loss), 0)
@@ -399,7 +384,6 @@ class REINVENT_trainer():
             loss.backward()
             optimizer.step()
 
-            # import pdb; pdb.set_trace()
             if len(self.memory) > 100:
 
                 log = {'top-1': self.memory["scores"][0], 
@@ -436,14 +420,11 @@ class REINVENT_trainer():
 
 
             if (step + 1) % 20 == 0:
-                # torch.save(agents[0].state_dict(), args.output_dir + f"QED_finetuned_{step+1}.pt")
                 self.writer.add_scalar('top-100-div', int_div(list(self.memory["smiles"][:100])), step)
                 self.writer.add_scalar('memory-div', int_div(list(self.memory["smiles"])), step)
 
             if (step + 1) % 50 == 0:
                 self.memory.to_csv(f'outputs/{self.oracle}/reinvent_{step+1}steps.csv')
-
-        # docking, qed, sa, mpo_score = get_original_docking_scores(self.memory["smiles"][:100], self.oracle)
 
         self.memory.to_csv(f'outputs/{self.oracle}/reinvent_{self.n_steps}steps.csv')
         print(f'top-1 score: {self.memory["scores"][0]}')
@@ -472,8 +453,6 @@ if __name__ == "__main__":
     parser.add_argument('--beta', type=float, default=50)
     parser.add_argument('--rank_coefficient', type=float, default=0.01)
     parser.add_argument('--kl_coefficient', type=float, default=0.01)
-    # parser.add_argument('--sim_penalize', type=bool, default=False)
-    # parser.add_argument('--sim_thres', type=float, default=0.7)
     parser.add_argument('--prior_path', type=str, default="genetic_gfn/data/Prior.ckpt")
     parser.add_argument('--vocab_path', type=str, default="genetic_gfn/data/Voc")
     parser.add_argument('--output_dir', type=str, default="log/")

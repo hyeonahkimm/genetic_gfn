@@ -6,7 +6,7 @@ from tdc import Oracle, Evaluator
 from rdkit.Chem import MolFromSmiles
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')
-from openbabel import pybel
+# from openbabel import pybel
 
 import subprocess
 import multiprocessing
@@ -15,29 +15,6 @@ import multiprocessing
 def int_div(smiles):
     evaluator = Evaluator(name = 'Diversity')
     return evaluator(smiles)
-
-# def get_scores(smiles, mode="QED", n_process=1):
-#     smiles_groups = []
-#     group_size = len(smiles) / n_process
-#     for i in range(n_process):
-#         smiles_groups += [smiles[int(i * group_size):int((i + 1) * group_size)]]
-
-#     temp_data = []
-#     # pool = multiprocessing.Pool(processes = n_process)
-#     # for index in range(n_process):
-#     #     temp_data.append(pool.apply_async(get_scores_subproc, args=(smiles_groups[index], mode, )))
-#     # pool.close()
-#     # pool.join()
-#     # scores = []
-#     # for index in range(n_process):
-#     #     scores += temp_data[index].get()
-#     scores = get_scores_subproc(smiles_groups[0], mode)
-
-#     for filename in glob.glob("docking/mols/*"):
-#         if os.path.exists(filename):
-#             os.remove(filename)
-
-#     return scores
 
 
 def get_scores(smiles, mode="QED", n_process=16):
@@ -55,10 +32,6 @@ def get_scores(smiles, mode="QED", n_process=16):
     scores = []
     for index in range(n_process):
         scores += temp_data[index].get()
-
-    # for filename in glob.glob("docking/tmp/*"):
-    #     if os.path.exists(filename):
-    #         os.remove(filename)
 
     return scores
 
@@ -133,8 +106,6 @@ def get_scores_subproc(smiles, mode):
                 except:
                     pass
                 
-                # if docking_score > 0.8:
-                #     print(smiles[i], docking_score)
             else:
                 scores += [-1.0, -1.0, 0.0, 0.0]
 
@@ -163,8 +134,6 @@ def get_scores_subproc(smiles, mode):
                 except:
                     pass
                 
-                # if docking_score > 0.8:
-                #     print(smiles[i], docking_score)
             else:
                 scores += [-1.0, -1.0, 0.0, 0.0]
 
