@@ -6,7 +6,7 @@ from tdc import Oracle, Evaluator
 from rdkit.Chem import MolFromSmiles
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')
-# from openbabel import pybel
+from openbabel import pybel
 
 import subprocess
 import multiprocessing
