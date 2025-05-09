@@ -1,6 +1,6 @@
 # Genetic-guided GFlowNets
 
-This repository provided implemented codes for the paper -- Genetic GFlowNets: Advancing in Practical Molecular Optimization Benchmark. 
+This repository provided implemented codes for the paper: Genetic-guided GFlowNets for Sample Efficient Molecular Optimization (NeurIPS, 2024). 
 > 
 
 The codes are implemented our code based on the practical molecular optimization benchmark.
